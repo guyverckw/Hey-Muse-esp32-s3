@@ -38,7 +38,7 @@
 #include "muse_settings.h"
 #include "muse_state.h"
 #include "muse_wifi.h"
-#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C
+#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C || CONFIG_MUSE_BOARD_WAVESHARE_S3_175
 #include "muse_wake.h"
 #endif
 
@@ -48,7 +48,7 @@ static const char *TAG = "muse_voice";
 #define TAIL_FRAMES (MUSE_AUDIO_RATE * 12 / 100)   /* capture lag + poll interval, stops before the release click */
 #define MAX_FRAMES (MUSE_AUDIO_RATE * MAX_SECS)
 #define MIN_HELD_FRAMES (MUSE_AUDIO_RATE * 3 / 10)   /* shorter presses are taps, not speech */
-#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C
+#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C || CONFIG_MUSE_BOARD_WAVESHARE_S3_175
 #define PRE_CHUNKS 60                                   /* 1.2 s so detection latency does not clip the command */
 #elif CONFIG_MUSE_BOARD_M5STACK_CARDPUTER_ADV
 #define PRE_CHUNKS 6                                   /* 120 ms; a 320 ms upload burst stalls on the ADV */
@@ -146,7 +146,7 @@ static void pre_reset(void)
 {
     s_pre_fill = 0;
     s_settle = SETTLE_CHUNKS;
-#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C
+#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C || CONFIG_MUSE_BOARD_WAVESHARE_S3_175
     muse_wake_reset();
 #endif
 }
@@ -175,7 +175,7 @@ static bool idle_capture(void)
 #endif
     s_pre_next = (s_pre_next + 1) % PRE_CHUNKS;
     s_pre_fill = s_pre_fill < PRE_CHUNKS ? s_pre_fill + 1 : PRE_CHUNKS;
-#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C
+#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C || CONFIG_MUSE_BOARD_WAVESHARE_S3_175
     if (!muse_wake_enabled()) {
         return false;
     }
@@ -485,7 +485,7 @@ static void go_idle(const char *caption)
     if (!caption) {
         caption = "";
     }
-#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C
+#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C || CONFIG_MUSE_BOARD_WAVESHARE_S3_175
     if (!caption[0] && muse_wake_enabled()) {
         caption = muse_lang_get("SAY HEY MUSE");
     }
@@ -519,7 +519,7 @@ static void set_resting(bool rest)
         return;
     }
     s_resting = rest;
-#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C
+#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C || CONFIG_MUSE_BOARD_WAVESHARE_S3_175
     muse_wake_reset();
 #endif
     muse_audio_power(!rest);
@@ -858,7 +858,7 @@ static void voice_task(void *arg)
             bool asleep = muse_state_asleep();
             bool battery = muse_state_on_battery();
             bool wake_listening = false;
-#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C
+#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C || CONFIG_MUSE_BOARD_WAVESHARE_S3_175
             wake_listening = muse_wake_enabled();
 #endif
             /* Screen sleep keeps Hey Muse's mic and detector running on battery.
@@ -938,7 +938,7 @@ static void voice_task(void *arg)
         muse_wifi_power(MUSE_WIFI_FULL);
         if (!can_record()) {
             pending_down = false;
-#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C
+#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C || CONFIG_MUSE_BOARD_WAVESHARE_S3_175
             if (hands_free) {
                 pre_reset();
             }
@@ -979,7 +979,7 @@ esp_err_t muse_voice_start(QueueHandle_t queue)
         muse_state_set_caption("AUDIO INIT FAILED");
         return ESP_FAIL;
     }
-#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C
+#if CONFIG_MUSE_BOARD_WAVESHARE_S3_175C || CONFIG_MUSE_BOARD_WAVESHARE_S3_175
     if (muse_wake_init() != ESP_OK) {
         ESP_LOGW(TAG, "Hey Muse detector unavailable; push-to-talk remains active");
     }

@@ -68,7 +68,7 @@ if(CONFIG_MUSE_ENABLED)
     if(CONFIG_MUSE_BOARD_WAVESHARE_S3_175C OR CONFIG_MUSE_BOARD_WAVESHARE_S3_175)
         # One driver: the 1.75 differs only in pins (its BSP's) and its PWR key.
         list(APPEND srcs "boards/board_waveshare_s3_175c.c" "boards/muse_lcd_bands.c")
-        if(CONFIG_MUSE_BOARD_WAVESHARE_S3_175C)
+        if(CONFIG_MUSE_BOARD_WAVESHARE_S3_175C OR CONFIG_MUSE_BOARD_WAVESHARE_S3_175)
             list(APPEND srcs "muse_wake.cpp")
             list(APPEND embed "models/hey_muse.tflite")
         endif()
@@ -136,7 +136,7 @@ if(CONFIG_MUSE_ENABLED)
         "LV_ASSERT_HANDLER=abort()\;")
 endif()
 
-if(CONFIG_MUSE_BOARD_WAVESHARE_S3_175C)
+if(CONFIG_MUSE_BOARD_WAVESHARE_S3_175C OR CONFIG_MUSE_BOARD_WAVESHARE_S3_175)
     # Match ESPHome's microWakeWord build flags, and enable Espressif's S3
     # kernels in the TFLite Micro component itself.
     target_compile_definitions(${COMPONENT_LIB} PRIVATE
