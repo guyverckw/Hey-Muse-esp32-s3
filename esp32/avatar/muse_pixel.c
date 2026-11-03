@@ -934,6 +934,20 @@ void muse_pixel_render(const muse_pose_t *p)
         return;
     }
 
+    /* ---- Custom robot: Speaking ---- */
+    if (p->mode == MUSE_MODE_SPEAKING) {
+        float level = p->level;
+
+        if (level < 0.15f) {
+            s_robot_frame = robot_speaking_01;
+        } else if (level < 0.45f) {
+            s_robot_frame = robot_speaking_02;
+        } else {
+            s_robot_frame = robot_speaking_03;
+        }
+        return;
+    }
+
     /* All other states keep the original Muse renderer. */
     s_robot_frame = NULL;
 

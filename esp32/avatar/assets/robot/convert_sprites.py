@@ -29,6 +29,9 @@ SPRITES = [
     "listening_02",
     "thinking_01",
     "thinking_02",
+    "speaking_01",
+    "speaking_02",
+    "speaking_03",
 ]
 
 WIDTH = 64
