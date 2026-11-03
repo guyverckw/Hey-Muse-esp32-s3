@@ -909,6 +909,31 @@ void muse_pixel_render(const muse_pose_t *p)
         return;
     }
 
+
+    /* ---- Custom robot: Listening ---- */
+    if (p->mode == MUSE_MODE_LISTENING) {
+        float cycle = fmodf(p->mode_t, 1.2f);
+
+        if (cycle < 0.6f) {
+            s_robot_frame = robot_listening_01;
+        } else {
+            s_robot_frame = robot_listening_02;
+        }
+        return;
+    }
+
+    /* ---- Custom robot: Thinking ---- */
+    if (p->mode == MUSE_MODE_THINKING) {
+        float cycle = fmodf(p->mode_t, 1.6f);
+
+        if (cycle < 0.8f) {
+            s_robot_frame = robot_thinking_01;
+        } else {
+            s_robot_frame = robot_thinking_02;
+        }
+        return;
+    }
+
     /* All other states keep the original Muse renderer. */
     s_robot_frame = NULL;
 

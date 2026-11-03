@@ -25,6 +25,10 @@ SPRITES = [
     "idle_01",
     "idle_02",
     "blink_01",
+    "listening_01",
+    "listening_02",
+    "thinking_01",
+    "thinking_02",
 ]
 
 WIDTH = 64
