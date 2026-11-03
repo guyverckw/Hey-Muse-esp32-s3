@@ -1,6 +1,7 @@
 // Copyright (c) Meta Platforms, Inc. and affiliates.
 
 #include "muse_pixel.h"
+#include "assets/robot/robot_sprites.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -850,8 +851,22 @@ void muse_pixel_set_size(int px)
     }
 }
 
+static const uint16_t *s_robot_frame = NULL;
+
 void muse_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int y1)
 {
+    if (s_robot_frame != NULL) {
+        for (int y = y0; y <= y1; y++) {
+            int sy = s_map[y] & 0x7f;
+            for (int x = x0; x <= x1; x++) {
+                int sx = s_map[x] & 0x7f;
+                dst[x - x0] = s_robot_frame[sy * 64 + sx];
+            }
+            dst += stride_px;
+        }
+        return;
+    }
+
     int n = x1 - x0 + 1;
     const uint8_t *xmap = &s_map[x0];
     const uint16_t *prev = NULL;
@@ -881,6 +896,23 @@ void muse_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int 
 
 void muse_pixel_render(const muse_pose_t *p)
 {
+    if (p->mode == MUSE_MODE_IDLE && p->happy <= 0.01f) {
+        float cycle = fmodf(p->t, 4.0f);
+
+        if (cycle >= 3.65f && cycle < 3.80f) {
+            s_robot_frame = robot_blink_01;
+        } else if (cycle >= 2.80f && cycle < 3.65f) {
+            s_robot_frame = robot_idle_02;
+        } else {
+            s_robot_frame = robot_idle_01;
+        }
+        return;
+    }
+
+    /* All other states keep the original Muse renderer. */
+    s_robot_frame = NULL;
+
+
     static bool s_luts;
     if (!s_luts) {
         init_luts();
