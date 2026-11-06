@@ -45,6 +45,8 @@ uint32_t muse_pixel_accent(muse_mode_t mode);
 
 /* Render one frame into Muse's own MUSE_PX_W x MUSE_PX_H grid. */
 void muse_pixel_render(const muse_pose_t *pose);
+/* Display an already-converted custom sleep sprite without changing Muse mode. */
+void muse_pixel_render_sleep(bool second_frame);
 
 /* Size (square, in screen pixels) muse_pixel_scale() blows the grid up to. */
 void muse_pixel_set_size(int px);

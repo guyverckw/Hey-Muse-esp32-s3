@@ -32,6 +32,17 @@ SPRITES = [
     "speaking_01",
     "speaking_02",
     "speaking_03",
+    "happy_01",
+    "happy_02",
+    "boot_01",
+    "boot_02",
+    "boot_03",
+    "error_01",
+    "error_02",
+    "poweroff_01",
+    "poweroff_02",
+    "sleep_01",
+    "sleep_02",
 ]
 
 WIDTH = 64

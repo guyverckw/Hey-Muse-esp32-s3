@@ -1109,28 +1109,61 @@ bool muse_ui_dark(void)
     return s_dark;
 }
 
-/* Returns true while asleep (skip rendering). */
-static bool update_sleep(void)
+/* Animated sleep/wake stages; all times are seconds from esp_timer_get_time().
+ * 0 = normal, 1 = displaying sleep frames, 2 = displaying wake frames.
+ * Keep these transitions in the LVGL timer; never block the display task.
+ */
+static int s_sleep_anim_phase;
+static float s_sleep_anim_since;
+#define ROBOT_SLEEP_ANIM_S 1.2f
+#define ROBOT_WAKE_ANIM_S 1.2f
+
+/* Returns true only when the panel is actually asleep. */
+static bool update_sleep(float now)
 {
     bool asleep = muse_state_asleep();
     if (asleep && !s_dark) {
-        muse_menu_close();
-        apply_brightness(0);
-        if (muse_board->panel_sleep) {
-            muse_board->panel_sleep(true);
+        if (s_sleep_anim_phase != 1) {
+            s_sleep_anim_phase = 1;
+            s_sleep_anim_since = now;
+            muse_menu_close();
+            image_hide_locked();
+            if (s_tv) {
+                lv_tileview_set_tile(s_tv, s_face, LV_ANIM_OFF);
+            }
         }
-        lv_obj_set_style_bg_opa(s_cover, LV_OPA_COVER, 0);
-        lv_obj_remove_flag(s_cover, LV_OBJ_FLAG_HIDDEN);
-        s_dark = true;
+        if (now - s_sleep_anim_since >= ROBOT_SLEEP_ANIM_S) {
+            /* Preserve the existing hardware power-down sequence. */
+            apply_brightness(0);
+            if (muse_board->panel_sleep) {
+                muse_board->panel_sleep(true);
+            }
+            lv_obj_set_style_bg_opa(s_cover, LV_OPA_COVER, 0);
+            lv_obj_remove_flag(s_cover, LV_OBJ_FLAG_HIDDEN);
+            s_dark = true;
+            s_sleep_anim_phase = 0;
+        }
     } else if (!asleep && s_dark) {
         s_dark = false;
         if (muse_board->panel_sleep) {
             muse_board->panel_sleep(false);
         }
-        /* Woken by a button: drop the cover now. Woken by touch: on release. */
+        /* Preserve touch-wake cover semantics from original firmware. */
         if (lv_obj_get_style_bg_opa(s_cover, 0) == LV_OPA_COVER) {
             lv_obj_add_flag(s_cover, LV_OBJ_FLAG_HIDDEN);
         }
+        s_sleep_anim_phase = 2;
+        s_sleep_anim_since = now;
+        image_hide_locked();
+        if (s_tv) {
+            lv_tileview_set_tile(s_tv, s_face, LV_ANIM_OFF);
+        }
+    } else if (!asleep && s_sleep_anim_phase == 1) {
+        /* Sleep request was cancelled by activity: resume immediately. */
+        s_sleep_anim_phase = 0;
+    }
+    if (s_sleep_anim_phase == 2 && now - s_sleep_anim_since >= ROBOT_WAKE_ANIM_S) {
+        s_sleep_anim_phase = 0;
     }
     if (!s_dark) {
         int target = muse_settings_brightness();
@@ -1145,7 +1178,6 @@ static bool update_sleep(void)
     }
     return s_dark;
 }
-
 /* Idle's label: whether a press reaches Hatch now or waits for Wi-Fi. */
 static const char *idle_name(muse_wifi_state_t wifi)
 {
@@ -1484,8 +1516,34 @@ static void frame_tick(lv_timer_t *timer)
         }
         s_last_mode = mode;
     }
-    if (update_sleep()) {
+    if (update_sleep(now)) {
         return;
+    }
+    if (s_sleep_anim_phase == 1) {
+        /* Two fixed 64x64 sprites, leaving LVGL free to flush each frame. */
+        float elapsed = now - s_sleep_anim_since;
+        muse_pixel_render_sleep(elapsed >= 0.6f);
+        invalidate_muse();
+        return;
+    }
+    if (s_sleep_anim_phase == 2) {
+        /* Real voice activity always takes precedence over the wake animation. */
+        if (mode == MUSE_MODE_LISTENING || mode == MUSE_MODE_THINKING ||
+            mode == MUSE_MODE_SPEAKING || mode == MUSE_MODE_ERROR ||
+            mode == MUSE_MODE_OFF) {
+            s_sleep_anim_phase = 0;
+        } else {
+            muse_pose_t wake_pose = {
+                .mode = MUSE_MODE_BOOT,
+                .t = now,
+                .mode_t = (now - s_sleep_anim_since) * (1.4f / ROBOT_WAKE_ANIM_S),
+                .level = 0,
+                .happy = 0,
+            };
+            muse_pixel_render(&wake_pose);
+            invalidate_muse();
+            return;
+        }
     }
     update_chrome(now);
     if (muse_menu_tick(now)) {

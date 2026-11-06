@@ -853,6 +853,12 @@ void muse_pixel_set_size(int px)
 
 static const uint16_t *s_robot_frame = NULL;
 
+void muse_pixel_render_sleep(bool second_frame)
+{
+    s_robot_frame = second_frame ? robot_sleep_02 : robot_sleep_01;
+}
+
+
 void muse_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int y1)
 {
     if (s_robot_frame != NULL) {
@@ -947,6 +953,39 @@ void muse_pixel_render(const muse_pose_t *p)
         }
         return;
     }
+
+    /* ---- Custom robot: Happy touch reaction (Idle only) ---- */
+    if (p->mode == MUSE_MODE_IDLE && p->happy > 0.01f) {
+        s_robot_frame = fmodf(p->t, 0.48f) < 0.24f
+            ? robot_happy_01 : robot_happy_02;
+        return;
+    }
+
+    /* ---- Custom robot: Boot ---- */
+    if (p->mode == MUSE_MODE_BOOT) {
+        if (p->mode_t < 0.45f) s_robot_frame = robot_boot_01;
+        else if (p->mode_t < 0.90f) s_robot_frame = robot_boot_02;
+        else s_robot_frame = robot_boot_03;
+        return;
+    }
+
+    /* ---- Custom robot: Error ---- */
+    if (p->mode == MUSE_MODE_ERROR) {
+        s_robot_frame = fmodf(p->mode_t, 1.0f) < 0.5f
+            ? robot_error_01 : robot_error_02;
+        return;
+    }
+
+    /* ---- Custom robot: Power-off ---- */
+    if (p->mode == MUSE_MODE_OFF) {
+        s_robot_frame = p->mode_t < 0.60f
+            ? robot_poweroff_01 : robot_poweroff_02;
+        return;
+    }
+
+    /* Sleep sprites are assets only: update_sleep() in muse_ui.c
+       currently returns before muse_pixel_render() when the display sleeps.
+       Do not interfere with low-power display behaviour here. */
 
     /* All other states keep the original Muse renderer. */
     s_robot_frame = NULL;
