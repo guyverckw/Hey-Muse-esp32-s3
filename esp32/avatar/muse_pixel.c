@@ -853,8 +853,15 @@ void muse_pixel_set_size(int px)
 
 static const uint16_t *s_robot_frame = NULL;
 
+
+/* ROBOT_SMOOTH_V6: integer-pixel motion; do not interpolate RGB565 pixels. */
+static int s_robot_y_shift = 0;
+static const uint16_t *s_robot_speaking_frame = NULL;
+static float s_robot_speaking_changed = 0.0f;
+
 void muse_pixel_render_sleep(bool second_frame)
 {
+    s_robot_y_shift = 0;
     s_robot_frame = second_frame ? robot_sleep_02 : robot_sleep_01;
 }
 
@@ -863,10 +870,11 @@ void muse_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int 
 {
     if (s_robot_frame != NULL) {
         for (int y = y0; y <= y1; y++) {
-            int sy = s_map[y] & 0x7f;
+            int sy = (s_map[y] & 0x7f) - s_robot_y_shift;
             for (int x = x0; x <= x1; x++) {
                 int sx = s_map[x] & 0x7f;
-                dst[x - x0] = s_robot_frame[sy * 64 + sx];
+                dst[x - x0] = (sy >= 0 && sy < 64)
+                    ? s_robot_frame[sy * 64 + sx] : 0;
             }
             dst += stride_px;
         }
@@ -902,55 +910,86 @@ void muse_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int 
 
 void muse_pixel_render(const muse_pose_t *p)
 {
-    if (p->mode == MUSE_MODE_IDLE && p->happy <= 0.01f) {
-        float cycle = fmodf(p->t, 4.0f);
+    /* ROBOT_SMOOTH_V6: one logical pixel at most, gentle periodic movement. */
+    s_robot_y_shift = 0;
+    if (p->mode != MUSE_MODE_SPEAKING) {
+        s_robot_speaking_frame = NULL;
+    }
+    /* V8 experiment: no whole-body Y motion in Listening or Thinking. */
 
-        if (cycle >= 3.65f && cycle < 3.80f) {
+    /* IDLE_EXPERIMENT_V7: 6 frames forward and reverse; retain blink. */
+    if (p->mode == MUSE_MODE_IDLE && p->happy <= 0.01f) {
+        float blink_cycle = fmodf(p->t, 4.0f);
+        if (blink_cycle >= 3.72f && blink_cycle < 3.86f) {
             s_robot_frame = robot_blink_01;
-        } else if (cycle >= 2.80f && cycle < 3.65f) {
-            s_robot_frame = robot_idle_02;
-        } else {
-            s_robot_frame = robot_idle_01;
+            return;
         }
+        static const uint16_t *const frames[] = {
+            robot_idle_experiment_01, robot_idle_experiment_02,
+            robot_idle_experiment_03, robot_idle_experiment_04,
+            robot_idle_experiment_05, robot_idle_experiment_06,
+            robot_idle_experiment_05, robot_idle_experiment_04,
+            robot_idle_experiment_03, robot_idle_experiment_02
+        };
+        int index = (int)(fmodf(p->t, 1.80f) / 0.18f);
+        if (index < 0) index = 0;
+        if (index > 9) index = 9;
+        s_robot_frame = frames[index];
         return;
     }
 
 
+    /* V8_LISTEN_THINK_EXPERIMENT: six source-derived opaque frames, ping-pong. */
     /* ---- Custom robot: Listening ---- */
     if (p->mode == MUSE_MODE_LISTENING) {
-        float cycle = fmodf(p->mode_t, 1.2f);
-
-        if (cycle < 0.6f) {
-            s_robot_frame = robot_listening_01;
-        } else {
-            s_robot_frame = robot_listening_02;
-        }
+        static const uint16_t *const frames[] = {
+            robot_listening_v8_01, robot_listening_v8_02, robot_listening_v8_03, robot_listening_v8_04, robot_listening_v8_05,
+            robot_listening_v8_06, robot_listening_v8_05, robot_listening_v8_04, robot_listening_v8_03, robot_listening_v8_02
+        };
+        const float frame_seconds = 0.14f;
+        const float cycle_seconds = 10.0f * frame_seconds;
+        float position = fmodf(p->mode_t, cycle_seconds);
+        int index = (int)(position / frame_seconds);
+        if (index < 0) index = 0;
+        if (index > 9) index = 9;
+        s_robot_frame = frames[index];
         return;
     }
 
+    /* V8_LISTEN_THINK_EXPERIMENT: six source-derived opaque frames, ping-pong. */
     /* ---- Custom robot: Thinking ---- */
     if (p->mode == MUSE_MODE_THINKING) {
-        float cycle = fmodf(p->mode_t, 1.6f);
-
-        if (cycle < 0.8f) {
-            s_robot_frame = robot_thinking_01;
-        } else {
-            s_robot_frame = robot_thinking_02;
-        }
+        static const uint16_t *const frames[] = {
+            robot_thinking_v8_01, robot_thinking_v8_02, robot_thinking_v8_03, robot_thinking_v8_04, robot_thinking_v8_05,
+            robot_thinking_v8_06, robot_thinking_v8_05, robot_thinking_v8_04, robot_thinking_v8_03, robot_thinking_v8_02
+        };
+        const float frame_seconds = 0.19f;
+        const float cycle_seconds = 10.0f * frame_seconds;
+        float position = fmodf(p->mode_t, cycle_seconds);
+        int index = (int)(position / frame_seconds);
+        if (index < 0) index = 0;
+        if (index > 9) index = 9;
+        s_robot_frame = frames[index];
         return;
     }
 
     /* ---- Custom robot: Speaking ---- */
     if (p->mode == MUSE_MODE_SPEAKING) {
+        const uint16_t *candidate;
         float level = p->level;
+        if (level < 0.15f) candidate = robot_speaking_01;
+        else if (level < 0.45f) candidate = robot_speaking_02;
+        else candidate = robot_speaking_03;
 
-        if (level < 0.15f) {
-            s_robot_frame = robot_speaking_01;
-        } else if (level < 0.45f) {
-            s_robot_frame = robot_speaking_02;
-        } else {
-            s_robot_frame = robot_speaking_03;
+        /* ROBOT_SMOOTH_V6: keep each full-body pose >= 120 ms. */
+        if (s_robot_speaking_frame == NULL ||
+            p->t - s_robot_speaking_changed >= 0.12f) {
+            if (candidate != s_robot_speaking_frame) {
+                s_robot_speaking_frame = candidate;
+                s_robot_speaking_changed = p->t;
+            }
         }
+        s_robot_frame = s_robot_speaking_frame;
         return;
     }
 
