@@ -13,7 +13,7 @@ An unofficial, community-maintained fork of the [Muse Gadgets SDK](https://githu
 - Local **“Hey Muse”** wake-word recognition; conversation processing uses the Muse connection.
 - Touchscreen UI and Muse mobile-app pairing over Bluetooth with Wi-Fi setup.
 - Optional spoken replies using **Fish Audio**; the API key is supplied by each user.
-- Existing CJK font data is retained for potential future localisation. **Multilingual voice interaction is not yet implemented or verified in this fork.**
+- **Multilingual voice conversations verified on hardware:** English, Cantonese (廣東話), and Mandarin (普通話). The author tested speaking and receiving spoken replies in all three languages using the existing Muse/Fish Audio voice pipeline; **no firmware changes were needed**. Broader language coverage and seamless automatic switching have not been verified. See the [multilingual test notes](docs/MULTILINGUAL.md).
 
 This is a personal/community project, not made or endorsed by Meta. Features and external services can change. The custom-avatar configuration has been tested on a 1.75-B; other supported hardware profiles may need separate testing.
 

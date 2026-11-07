@@ -166,6 +166,7 @@ With the gadget paired and connected:
 - **Listening / Thinking:** The robot changes to its respective animated pose while listening and processing.
 - **Speaking:** Ask a question and watch the responsive Speaking movement while Fish Audio plays the reply (if configured).
 - **Other states:** Check touch reactions, Sleep/Wake and Power-off in normal use. Preserve working settings; do not factory-reset just to test the avatar.
+- **Languages (verified):** After saying “Hey Muse”, ask a question in English, Cantonese or Mandarin; verify that Hey Muse understands and speaks the answer in that language. See [multilingual test notes](MULTILINGUAL.md) for example prompts and scope of testing.
 
 Audio interaction still depends on a working Muse connection; the wake word is on-device, but the overall assistant is **not fully offline**.
 
