@@ -1,158 +1,91 @@
-<!--
-Copyright (c) Meta Platforms, Inc. and affiliates.
+# Hey Muse ESP32-S3 — Custom Animated Robot Avatar
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+An unofficial, community-maintained fork of the [Muse Gadgets SDK](https://github.com/facebookincubator/muse-gadget-sdk), adding a custom pixel-art robot avatar and on-device **“Hey Muse”** wake-word detection to supported ESP32 devices.
 
-    http://www.apache.org/licenses/LICENSE-2.0
+> **Tested custom-avatar hardware:** Waveshare **ESP32-S3-Touch-AMOLED-1.75-B** (the non-C 1.75-inch board). For this board, use the **`s3n`** build target. **Do not use `s3`**, which selects the distinct 1.75C hardware profile.
+>
+> **Release source:** The custom-avatar work is on the [`feature/smooth-animation`](https://github.com/guyverckw/Hey-Muse-esp32-s3/tree/feature/smooth-animation) branch. A quick start that checks out this branch is provided below. The default branch may not contain the same avatar features.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
--->
+## What works
 
-# Hey Muse for ESP32-S3
+- Custom 64×64 RGB565 robot sprite avatar with animated **Idle, Blink, Listening, Thinking, Speaking, Happy, Boot, Error, Power-off and Sleep/Wake** states.
+- More fluid multi-frame Idle, Listening and Thinking animation, plus audio-responsive Speaking animation.
+- Local **“Hey Muse”** wake-word recognition; conversation processing uses the Muse connection.
+- Touchscreen UI and Muse mobile-app pairing over Bluetooth with Wi-Fi setup.
+- Optional spoken replies using **Fish Audio**; the API key is supplied by each user.
+- Existing CJK font data is retained for potential future localisation. **Multilingual voice interaction is not yet implemented or verified in this fork.**
 
-Experimental, English-first community firmware adding on-device **“Hey Muse”**
-wake-word recognition to the Waveshare ESP32-S3-Touch-AMOLED-1.75C, using the
-Muse Gadgets SDK. The on-device menus, phone setup, documentation, and Muse
-replies are English-only. Push-to-talk remains available. The wake detector
-runs locally; voice turns use the existing Muse connection.
+This is a personal/community project, not made or endorsed by Meta. Features and external services can change. The custom-avatar configuration has been tested on a 1.75-B; other supported hardware profiles may need separate testing.
 
-This is an unofficial community project, not made or endorsed by Meta. It is
-based on the [Muse Gadgets SDK](https://github.com/facebookincubator/muse-gadget-sdk).
-The wake-word model is from [wobsoriano/hey-muse](https://github.com/wobsoriano/hey-muse);
-its MIT license and attribution are included beside the model.
+## Quick start — Waveshare 1.75-B
 
-For a start-to-finish guide to installing ESP-IDF, building and flashing the
-1.75C, pairing with Muse, saving a Fish Audio key, and testing voice replies,
-see the [setup guide](docs/SETUP.md).
+**Prerequisites:** macOS or Linux, Git, a USB **data** cable, [ESP-IDF v6.0.1](https://docs.espressif.com/projects/esp-idf/en/release-v6.0/esp32s3/get-started/index.html) with ESP32-S3 support, your own [Muse SDK token](https://gadgets.muse.ai/settings/sdk-tokens), the Muse mobile app, and access to a trusted **2.4 GHz Wi-Fi** network. For spoken replies, obtain an optional [Fish Audio API key](https://fish.audio/app/api-keys).
 
-Choose between the configured Muse, Ethan, and Sarah Fish Audio voices on the
-device under **Settings → Voice Replies**.
+```bash
+# 1. Clone the correct branch
+git clone --branch feature/smooth-animation --single-branch \
+  https://github.com/guyverckw/Hey-Muse-esp32-s3.git
+cd Hey-Muse-esp32-s3/esp32
 
-## Status
+# 2. Activate your installed ESP-IDF 6.0.1 environment
+. ~/esp/esp-idf-v6/export.sh
 
-Wake-word detection and hands-free recording are experimental. The firmware
-has been built and flashed on 1.75C hardware during development; the voice flow
-still needs broader real-world testing. On the 1.75C, “Hey Muse” remains
-available while the screen is asleep, including on battery. This keeps the
-microphone and detector active and uses more battery than button-only sleep. See
-[`esp32/devices/README.md`](esp32/devices/README.md) for board notes.
+# 3. Configure your PERSONAL Muse SDK token for the 1.75-B build
+B=build-muse-waveshare-s3-175
+idf.py -B "$B" -DIDF_TARGET=esp32s3 \
+  -DSDKCONFIG="$B/sdkconfig" \
+  -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-s3-175" \
+  menuconfig
+# In menuconfig, search for GADGET_SDK_TOKEN; save and exit.
 
-## Build and flash
+# 4. Compile the 1.75-B image (may take a while)
+tools/muse/board.sh build s3n
 
-1. Install and activate **ESP-IDF 6.0.1** with support for the `esp32s3` target.
-   See the [Espressif ESP-IDF setup guide](https://docs.espressif.com/projects/esp-idf/en/release-v6.0/esp32s3/get-started/index.html).
-   In every new terminal, activate the same ESP-IDF Python environment used to
-   configure the build directory. This project uses Python 3.12.13. If another
-   Python version is active, run:
-
-   ```sh
-   cd ~/esp/esp-idf-v6
-   export IDF_PYTHON_ENV_PATH="$HOME/.espressif/python_env/idf6.0_py3.12_env"
-   . ./export.sh
-   python --version
-   ```
-
-   Confirm it reports Python 3.12, then change to this repository's `esp32/`
-   directory. For this checkout, run:
-
-   ```sh
-   cd ~/Developer/hey-muse-esp32-s3-clean-test/esp32
-   ```
-
-   If you cloned the repository somewhere else, `cd` to that clone's `esp32/`
-   directory instead. ESP-IDF activation adds `idf.py` to the current
-   terminal's PATH; it must be repeated when you open another terminal. If you
-   see an error that Python 3.14 is active but the build was configured with
-   Python 3.12, follow these steps instead of running `fullclean`.
-2. From `esp32/`, open the 1.75C configuration menu:
-
-   ```sh
-   B=build-muse-waveshare-s3-175c
-   idf.py -B "$B" -DIDF_TARGET=esp32s3 \
-     -DSDKCONFIG="$B/sdkconfig" \
-     -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-s3-175c" \
-     menuconfig
-   ```
-
-   Search for `GADGET_SDK_TOKEN`, enter your own Muse SDK token, then save and
-   exit. Each builder needs their own token; never commit or share it.
-3. Build and flash the Waveshare 1.75C from `esp32/`:
-
-   ```sh
-   tools/muse/board.sh build s3
-   ```
-
-   The build helper sends its detailed output to `/tmp/muse_build_s3.log`, so
-   the terminal can appear idle while it compiles. To watch progress, open a
-   second terminal and run:
-
-   ```sh
-   tail -f /tmp/muse_build_s3.log
-   ```
-
-   Wait for the build command to finish successfully before flashing. Then run
-   this in the project terminal:
-
-   ```sh
-   tools/muse/board.sh flash s3
-   ```
-
-   The flash helper detects the board's USB port when it is the only matching
-   board connected. With multiple boards attached, pass the 1.75C serial number
-   or port, for example `tools/muse/board.sh flash s3 /dev/cu.usbmodem…`.
-
-The firmware build can contain the SDK token from `sdkconfig`. Do not publish a
-`.bin` built with your personal token. Keep the token in the ignored local
-build configuration and have each user build with their own token. The same
-rule applies to the optional Fish Audio key below. Device logs report only
-whether the Muse token is configured; they must never print any part of it.
-
-## Add spoken replies
-
-All spoken replies use Fish Audio's S2.1 Pro Free TTS API. Muse's reply text is
-sent to Fish over HTTPS; microphone audio is not sent to Fish. The API key is
-saved on the device after flashing by default. You can choose the voice from
-the three slots configured in menuconfig: Muse, Ethan, and Sarah. Slot 1 defaults
-to [Muse](https://fish.audio/app/m/1df12c4bb692423283fde2bdc7f84093); slots 2
-and 3 default to the Ethan and Sarah voice IDs supplied for this project.
-
-To configure voice slots, run this from `esp32/`:
-
-```sh
-idf.py -B build-muse-waveshare-s3-175c menuconfig
+# 5. Identify the connected serial port, then flash
+# macOS: ls /dev/cu.usbmodem*
+# Linux: ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null
+tools/muse/board.sh flash s3n YOUR_SERIAL_PORT
 ```
 
-Open **ESP32 Device SDK → Hey Muse Fish Audio**. Set a name and Fish Audio
-model ID for each slot you want to use, then save `sdkconfig`, rebuild, and
-flash. Phone Setup will then let you choose among those configured voices.
-Fish Audio uses the model ID as the request's `reference_id`.
+Replace `YOUR_SERIAL_PORT` with the actual port, e.g. `/dev/cu.usbmodem14201` on macOS or `/dev/ttyACM0` on Linux. **Do not type the example port unless it is actually yours.** Do not run `erase-flash`: normal flashing should preserve existing pairing, Wi-Fi and Fish Audio settings on an already-configured device.
 
-Create a Fish Audio API key at <https://fish.audio/app/api-keys>. With the
-1.75C connected by USB, run this from `esp32/` in an ESP-IDF terminal:
+**New to ESP-IDF, setting up Muse, or enabling Fish Audio?** Follow the full **[1.75-B setup and troubleshooting guide](docs/QUICKSTART_175B.md)**. It explains every step, including ESP-IDF installation, first-time pairing and how to save a Fish Audio API key.
 
-```sh
+## Board profiles: choose carefully
+
+| Hardware | Helper target | Build directory | Guidance |
+| --- | --- | --- | --- |
+| **Waveshare ESP32-S3-Touch-AMOLED-1.75-B / non-C 1.75** | **`s3n`** | `esp32/build-muse-waveshare-s3-175/` | **Tested custom avatar: [quick start](docs/QUICKSTART_175B.md)** |
+| Waveshare ESP32-S3-Touch-AMOLED-1.75C | `s3` | `esp32/build-muse-waveshare-s3-175c/` | [Existing 1.75C setup guide](docs/SETUP.md); custom-avatar experience not verified here |
+
+**The two board targets are not interchangeable.** Check the exact name printed on the board or its product documentation before flashing.
+
+## Device pairing and voice replies
+
+After the first flash, open the Muse app, enable developer mode under **Settings → Devices**, add the nearby `MuseGadget-XXXXXX` device, and follow the on-screen prompts to set up Wi-Fi and pairing. To add Fish Audio spoken replies, return to `esp32/` with the board connected over USB, close any serial monitor, and run:
+
+```bash
 python tools/muse/save_fish_api_key.py
 ```
 
-The helper finds the connected board and asks for the key with hidden input.
-It sends the key over USB, prints only the save result, and stores it in
-device NVS. This firmware does not encrypt the NVS partition at rest. Check
-**Settings > Voice replies** for
-`Fish Audio API key saved`. You can also enter the key on the Bluetooth setup
-page. Alternatively, set **Fish Audio API key (local builds only)** in the
-menuconfig page above. That embeds the key in the firmware; anyone who receives
-the binary can extract and use it. Keep `sdkconfig` and binaries with personal
-keys private. Free-tier availability and fair-use limits follow Fish Audio's
-current terms.
+The helper prompts for your key without echoing it and stores it in device NVS. On the board, check **Settings → Voice Replies**. The Fish Audio key is optional; without it, responses can still appear as text. Fish Audio is a network service, **not offline TTS**.
 
-## License
+## Build maintenance and troubleshooting
 
-The Muse Gadgets SDK source is licensed under Apache-2.0; see [`LICENSE`](LICENSE).
-The Hey Muse model is distributed under MIT; see
-[`esp32/components/muse/models/HEY-MUSE-LICENSE`](esp32/components/muse/models/HEY-MUSE-LICENSE).
+- **Build log:** `tools/muse/board.sh build s3n` uses `/tmp/muse_build_s3n.log`. Check it with `tail -n 40 /tmp/muse_build_s3n.log`.
+- **Compiler environment:** Activate the same ESP-IDF 6.0.1 and Python environment each time. If `idf.py` is unavailable, re-run the `export.sh` command.
+- **Serial port:** Use a data-capable cable. List ports, and close other serial monitors before flashing.
+- **SDK token:** A missing or invalid personal token may prevent pairing. Configure it locally in the **non-C** build configuration and rebuild.
+- **Firmware size:** Verify that `esp32/build-muse-waveshare-s3-175/muse-gadget.bin` fits the app partition; **do not change partition layouts casually**.
+- **Sprite source:** The robot PNGs and converter are under `esp32/avatar/assets/robot/`. The generated `robot_sprites.h` is checked in; **regeneration is not required for a normal clone/build**. To change artwork, see the [developer section](docs/QUICKSTART_175B.md#developers-customising-the-avatar).
+
+## Security and responsible sharing
+
+- **Every builder must supply their own Muse SDK token.** Keep your `sdkconfig` and any firmware binaries built with embedded credentials private.
+- Keep Fish Audio keys, Wi-Fi passwords, device logs containing secrets, and credentials **out of Git and issue reports**. The current NVS configuration does not encrypt Fish Audio credentials at rest.
+- Do not commit experimental backups, temporary installers, or credentials accidentally created as filenames. Check `git diff --cached --name-only` before every push.
+- Review Muse and Fish Audio terms and applicable costs before use.
+
+## Credits and licensing
+
+This fork builds on the [Muse Gadgets SDK](https://github.com/facebookincubator/muse-gadget-sdk) and [wobsoriano/hey-muse](https://github.com/wobsoriano/hey-muse). See the repository [`LICENSE`](LICENSE) (Apache-2.0) and [`esp32/components/muse/models/HEY-MUSE-LICENSE`](esp32/components/muse/models/HEY-MUSE-LICENSE) (wake-model attribution). The custom avatar is a community modification.
