@@ -856,8 +856,8 @@ static const uint16_t *s_robot_frame = NULL;
 
 /* ROBOT_SMOOTH_V6: integer-pixel motion; do not interpolate RGB565 pixels. */
 static int s_robot_y_shift = 0;
-static const uint16_t *s_robot_speaking_frame = NULL;
 static float s_robot_speaking_changed = 0.0f;
+static int s_robot_speaking_band = -1; /* SPEAKING_V9 */
 
 void muse_pixel_render_sleep(bool second_frame)
 {
@@ -913,7 +913,7 @@ void muse_pixel_render(const muse_pose_t *p)
     /* ROBOT_SMOOTH_V6: one logical pixel at most, gentle periodic movement. */
     s_robot_y_shift = 0;
     if (p->mode != MUSE_MODE_SPEAKING) {
-        s_robot_speaking_frame = NULL;
+        s_robot_speaking_band = -1;
     }
     /* V8 experiment: no whole-body Y motion in Listening or Thinking. */
 
@@ -973,23 +973,44 @@ void muse_pixel_render(const muse_pose_t *p)
         return;
     }
 
-    /* ---- Custom robot: Speaking ---- */
+    /* SPEAKING_V9: three micro-expression variants per audio-intensity pose. */
     if (p->mode == MUSE_MODE_SPEAKING) {
-        const uint16_t *candidate;
         float level = p->level;
-        if (level < 0.15f) candidate = robot_speaking_01;
-        else if (level < 0.45f) candidate = robot_speaking_02;
-        else candidate = robot_speaking_03;
+        int desired = level < 0.15f ? 0 : level < 0.45f ? 1 : 2;
 
-        /* ROBOT_SMOOTH_V6: keep each full-body pose >= 120 ms. */
-        if (s_robot_speaking_frame == NULL ||
-            p->t - s_robot_speaking_changed >= 0.12f) {
-            if (candidate != s_robot_speaking_frame) {
-                s_robot_speaking_frame = candidate;
+        if (s_robot_speaking_band < 0) {
+            s_robot_speaking_band = desired;
+            s_robot_speaking_changed = p->t;
+        } else if (p->t - s_robot_speaking_changed >= 0.12f) {
+            /* A little hysteresis around the old 0.15 and 0.45 cut-offs. */
+            int next = s_robot_speaking_band;
+            if (next == 0) {
+                if (level > 0.50f) next = 2;
+                else if (level > 0.20f) next = 1;
+            } else if (next == 1) {
+                if (level > 0.50f) next = 2;
+                else if (level < 0.10f) next = 0;
+            } else {
+                if (level < 0.10f) next = 0;
+                else if (level < 0.38f) next = 1;
+            }
+            if (next != s_robot_speaking_band) {
+                s_robot_speaking_band = next;
                 s_robot_speaking_changed = p->t;
             }
         }
-        s_robot_frame = s_robot_speaking_frame;
+
+        static const uint16_t *const frames[3][3] = {
+            {robot_speaking_v9_01_01, robot_speaking_v9_01_02, robot_speaking_v9_01_03},
+            {robot_speaking_v9_02_01, robot_speaking_v9_02_02, robot_speaking_v9_02_03},
+            {robot_speaking_v9_03_01, robot_speaking_v9_03_02, robot_speaking_v9_03_03},
+        };
+        /* Neutral -> brighter expression -> dimmer -> brighter, repeat. */
+        int phase = (int)(fmodf(p->mode_t, 0.36f) / 0.09f);
+        if (phase < 0) phase = 0;
+        if (phase > 3) phase = 3;
+        int expression = phase == 3 ? 1 : phase;
+        s_robot_frame = frames[s_robot_speaking_band][expression];
         return;
     }
 
