@@ -1,0 +1,37 @@
+# Raspberry Pi runtime secrets and authentication
+.env
+.env.*
+!.env.example
+bridge_token
+**/bridge_token
+*token*.secret
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+secrets.json
+
+# Live state, history and private conversation content
+refresh_state.json
+reply_history.json
+history.json
+*.db
+*.sqlite
+*.sqlite3
+data/
+state/
+logs/
+*.log
+
+# Local backups, preview images, caches, environments
+muse_pi.before_*.py
+*.before_*.py
+preview_*.png
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
