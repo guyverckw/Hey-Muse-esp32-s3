@@ -143,3 +143,23 @@ After staging the Phase 5 source and systemd unit, user supplied the following R
 - Pre-deployment: Python compilation, two singleton tests, three pagination tests, dependencies and systemd validation all passed
 
 **Status: PASS for initial systemd startup and bridge health; pending controlled restart, live reply/display check, automatic failure recovery and real reboot.** PIDs and timestamps above describe this particular run, not guaranteed future startup values.
+
+## Restart and failure-recovery tests — user report
+
+The user ran a controlled `sudo systemctl restart hey-muse-pi.service`: the unit returned `active` and showed new MainPID **58527**, but an immediately issued `curl /health` failed with connection refused. This is consistent with `Type=simple` reporting active before Python has bound port 8765; **HTTP readiness after that controlled restart was not confirmed in that same test**.
+
+The user then executed `sudo systemctl kill -s SIGKILL --kill-who=main hey-muse-pi.service`, waited 15 seconds, and observed `active`, MainPID **58587**, and `NRestarts=1`. The pasted `curl` output was partially garbled but appears to show the bridge's JSON health response. **Unexpected-failure restart: PASS; bridge readiness: very likely PASS, independently recheck with an explicit retry loop.** Do not infer clean boot recovery until an actual reboot test.
+
+Recommended readiness probe (no hardware side effects):
+
+```bash
+for i in $(seq 1 20); do
+  if curl -fsS --max-time 2 http://127.0.0.1:8765/health; then
+    echo "HTTP bridge ready (attempt $i)"
+    break
+  fi
+  sleep 1
+done
+```
+
+Note that `Type=simple` is not a readiness protocol; avoid interpreting an immediate port refusal as failure while the program is starting. Do not change to `Type=notify` without implementing `sd_notify` in the application.
