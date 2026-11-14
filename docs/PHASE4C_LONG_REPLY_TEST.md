@@ -118,3 +118,13 @@ After flashing the corrected build, for a real voice interaction inspect serial 
 Compare the selected and queued byte counts with the most recent Pi history entry (check the **source is esp32**). Do not paste private reply content, credentials or tokens into diagnostics.
 
 **Separate scope:** Fish Audio still reads from the 1 KiB speech buffer; spoken audio may stop early even when a full multi-page e-paper reply is delivered. Do not mark full-length TTS solved by this fix. If the **server itself** terminates generation early, that is a separate issue from the Pi forwarding limit.
+
+## Follow-up Pi result — 2026-11-14
+
+After the corrected firmware rebuild/reflash sequence, user reported the latest saved Pi message as:
+
+- Source: `esp32`
+- UTF-8 bytes: **3,327** (previous failed test: **1,023**)
+- Unicode characters: **3,305** (previous: **1,017**)
+
+**Result:** ESP32-to-Pi forwarding of a message longer than the prior 1,023-byte limit is confirmed by Pi history. Still pending: confirmation the message ends naturally without truncation, live wake-word/Fish Audio/OLED regression results, and full multi-page navigation with the new real reply. The existing TTS 1 KiB buffer is unchanged.
