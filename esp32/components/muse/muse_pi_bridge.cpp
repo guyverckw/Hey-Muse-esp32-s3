@@ -92,6 +92,7 @@ static void enqueue_item(const char *text, bool is_status) {
     if (!copy) { ESP_LOGW(TAG, "Out of memory copying reply"); return; }
     memcpy(copy, text, len);
     copy[len] = 0;
+    if (!is_status) ESP_LOGI(TAG, "Pi reply queued: %u UTF-8 bytes", (unsigned)len);
     Reply msg{copy, is_status};
     if (xQueueSend(s_queue, &msg, 0) != pdTRUE) {
         free(copy);
