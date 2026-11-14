@@ -131,3 +131,15 @@ The rollback example does not delete conversation history, bridge token or refre
 - [ ] Automatic failure restart succeeds safely
 - [ ] Reboot startup succeeds (tested when convenient)
 - [ ] Rollback copy saved and verified
+
+## Hardware deployment progress — 2026-11-14
+
+After staging the Phase 5 source and systemd unit, user supplied the following Raspberry Pi outputs:
+
+- `hey-muse-pi.service`: loaded, **enabled**, **active (running)** (started 2026-11-14 23:19:06 GMT)
+- Process: one `/usr/bin/python3 -u /home/musepi/hey-muse-display/muse_pi.py --listen 0.0.0.0 --port 8765` instance (observed PID 58364)
+- `curl http://127.0.0.1:8765/health`: `{"status":"ok","service":"hey-muse-pi-bridge"}`
+- Service log: displays initialized, bridge listening, refresh cooldown **180s**
+- Pre-deployment: Python compilation, two singleton tests, three pagination tests, dependencies and systemd validation all passed
+
+**Status: PASS for initial systemd startup and bridge health; pending controlled restart, live reply/display check, automatic failure recovery and real reboot.** PIDs and timestamps above describe this particular run, not guaranteed future startup values.
