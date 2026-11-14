@@ -38,7 +38,9 @@ from PIL import Image, ImageDraw, ImageFont
 EPAPER_ROTATE_180 = True
 OLED_ROTATE_180 = True
 EPD_W, EPD_H = 600, 448
-MIN_REFRESH_SECONDS = 180
+# Waveshare recommends 180 seconds for regular use. Set
+# MUSE_EPAPER_REFRESH_SECONDS=30 only for short supervised navigation tests.
+MIN_REFRESH_SECONDS = max(30, int(os.environ.get("MUSE_EPAPER_REFRESH_SECONDS", "180")))
 MAX_POST_BYTES = 32 * 1024
 MAX_REPLY_CHARS = 12000
 MAX_HISTORY = 30
@@ -503,6 +505,9 @@ def run_app(inbox: Inbox, bind: str, port: int):
     LIVE_STATUS_TIMEOUT = 90.0
     # AUTO_EPAPER_REFRESH_PATCH_V1: pending latest reply, handled in the main loop.
     pending_auto_refresh = False
+    # Manual page changes should survive both the cooldown and a busy panel.
+    # While waiting, the most recent selection wins.
+    pending_manual_refresh = False
     # MUSE_ASYNC_EPAPER_PATCH_V1: one e-paper job at a time, never draw OLED in worker.
     epaper_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="muse_epaper")
     epaper_future = None
@@ -524,12 +529,14 @@ def run_app(inbox: Inbox, bind: str, port: int):
             draw.text((32, 2), "HEY MUSE", fill="white")
             draw.line((4, 16, 123, 16), fill="white")
             draw.text((4, 19), "> " + MENU[selected], fill="white")
-            text, _, _ = current()
-            pages = paginate(text)
+            text, heading, _ = current()
+            pages = paginate(text, heading=heading)
             if view == "reply":
                 subtitle = f"Reply {len(inbox.messages)} | {page + 1}/{len(pages)}"
             else:
                 subtitle = f"{view} | {page + 1}/{len(pages)}"
+            if pending_manual_refresh:
+                subtitle += " Q"
             draw.text((4, 33), subtitle[:21], fill="white")
             # Status line is independent of manual menu and e-paper view.
             if live_status != "idle":
@@ -549,18 +556,21 @@ def run_app(inbox: Inbox, bind: str, port: int):
         epd.display(epd.getbuffer(black), epd.getbuffer(yellow))
         epd.sleep()
 
-    def refresh():
-        nonlocal message, new_reply, pending_auto_refresh
+    def refresh(manual=True):
+        nonlocal message, new_reply, pending_auto_refresh, pending_manual_refresh
         nonlocal epaper_future, epaper_job_latest
-        # Manual requests while busy do not schedule an overlapping job.
+        if manual:
+            # A button press updates the desired view/page immediately;
+            # e-paper writes are deferred until it is safe to start a new one.
+            pending_manual_refresh = True
         if epaper_future is not None:
-            message = "E-paper busy"
+            message = "Page queued (e-paper busy)" if manual else "E-paper busy"
             draw_oled()
             return False
 
         remaining = inbox.remaining()
         if remaining:
-            message = f"Wait {remaining}s (KEY2)"
+            message = f"Page queued ({remaining}s)" if manual else f"Wait {remaining}s"
             print("E-paper cooldown:", remaining, "seconds")
             draw_oled()
             return False
@@ -591,6 +601,9 @@ def run_app(inbox: Inbox, bind: str, port: int):
             message = "E-paper error"
             draw_oled()
             raise
+        # The current selection is now represented by the submitted image.
+        # Any subsequent button press can queue another selection.
+        pending_manual_refresh = False
         print("E-paper refresh beginning (background operation)...", flush=True)
         draw_oled()
         return True
@@ -625,8 +638,8 @@ def run_app(inbox: Inbox, bind: str, port: int):
 
     def move_page(delta: int):
         nonlocal page, message
-        text, _, _ = current()
-        count = len(paginate(text))
+        text, heading, _ = current()
+        count = len(paginate(text, heading=heading))
         page = (page + delta) % count
         message = f"Page {page+1}/{count}"
         refresh()
@@ -636,7 +649,7 @@ def run_app(inbox: Inbox, bind: str, port: int):
     print("UP/DOWN menu, SELECT activate, LEFT/RIGHT pages")
     print("KEY1 home, KEY2 latest reply, KEY3 previous page")
     print("New network replies auto-refresh when e-paper cooldown permits.")
-    print("Ctrl+C to quit. Refresh interval >=180 seconds.")
+    print(f"Ctrl+C to quit. Refresh cooldown: {MIN_REFRESH_SECONDS}s.")
     try:
         while True:
             # Complete finished e-paper job in the main thread; do not touch
@@ -701,14 +714,22 @@ def run_app(inbox: Inbox, bind: str, port: int):
                         choose()
                     draw_oled()
                 previous[name] = down
-            # Only schedule refresh from the main thread; hardware work
-            # runs in the background. Latest reply wins after cooldown.
-            if (pending_auto_refresh and epaper_future is None
-                    and inbox.messages and inbox.remaining() == 0):
+            # Prioritise a button-selected page over auto-refresh. A page
+            # requested during a busy job or cooldown must not be lost.
+            if (pending_manual_refresh and epaper_future is None
+                    and inbox.remaining() == 0):
+                try:
+                    refresh(manual=True)
+                except Exception as exc:
+                    print(f"Queued page refresh failed: {exc!r}", flush=True)
+            # Automatic refresh only starts after any manual request is handled.
+            elif (not pending_manual_refresh and pending_auto_refresh
+                    and epaper_future is None and inbox.messages
+                    and inbox.remaining() == 0):
                 view, history_index, page = "reply", -1, 0
                 print("Auto-refresh: showing the latest AI reply")
                 try:
-                    refresh()
+                    refresh(manual=False)
                 except Exception as exc:
                     # refresh() persists its cooldown before accessing e-paper.
                     # Keep pending to retry after the cooldown; do not kill the UI.
