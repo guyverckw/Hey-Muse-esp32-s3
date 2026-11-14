@@ -1424,6 +1424,21 @@ static void show_reply_start(const msg_t &m)
     }
 }
 
+/* The final event may carry a shortened preview rather than the streamed
+ * answer. Select the longer available representation for the Pi only. */
+static const char *pi_reply_text(const msg_t &m, int i, const char *final_text)
+{
+    const char *streamed = m.pi_full ? m.pi_full :
+        (s_turn.texts ? s_turn.texts + i * TEXT_MAX : m.tail);
+    const size_t streamed_len = streamed ? strlen(streamed) : 0;
+    const size_t final_len = (final_text && final_text[0]) ? strlen(final_text) : 0;
+    const char *chosen = final_len > streamed_len ? final_text : streamed;
+    ESP_LOGI(TAG, "Pi reply bytes stream=%u final=%u selected=%u (cap=%u)",
+             (unsigned)streamed_len, (unsigned)final_len,
+             (unsigned)(chosen ? strlen(chosen) : 0), (unsigned)PI_REPLY_MAX_BYTES);
+    return chosen;
+}
+
 static void message_done(int i, const char *final_text)
 {
     msg_t &m = s_turn.msgs[i];
@@ -1441,9 +1456,7 @@ static void message_done(int i, const char *final_text)
         }
         muse_hatch_console("message_done", nullptr, "\"msg\":%d,\"bytes\":%u", i, (unsigned)n);
         ESP_LOGI(TAG, "message %s done (%u chars)", m.id, (unsigned)n);
-        const char *pi_reply = (final_text && final_text[0]) ? final_text
-            : (m.pi_full ? m.pi_full : (s_turn.texts ? s_turn.texts + i * TEXT_MAX : m.tail));
-        muse_pi_bridge_enqueue(pi_reply);
+        muse_pi_bridge_enqueue(pi_reply_text(m, i, final_text));
         return;
     }
     if (!m.len && final_text && final_text[0]) {
@@ -1452,9 +1465,7 @@ static void message_done(int i, const char *final_text)
     if (m.len && m.tts == TTS_NONE) {
         m.tts = TTS_QUEUED;
     }
-        const char *pi_reply = (final_text && final_text[0]) ? final_text
-            : (s_turn.texts ? s_turn.texts + i * TEXT_MAX : m.tail);
-        muse_pi_bridge_enqueue(pi_reply);
+    muse_pi_bridge_enqueue(pi_reply_text(m, i, final_text));
     ESP_LOGI(TAG, "message %s done (%u chars)", m.id, (unsigned)m.len);
 }
 
