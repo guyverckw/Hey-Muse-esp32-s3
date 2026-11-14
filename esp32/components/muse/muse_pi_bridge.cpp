@@ -79,8 +79,15 @@ static void enqueue_item(const char *text, bool is_status) {
         BaseType_t ok = xTaskCreate(worker, "pi_bridge", 6144, nullptr, 4, nullptr);
         if (ok != pdPASS) { ESP_LOGW(TAG, "Could not create bridge worker"); vQueueDelete(s_queue); s_queue = nullptr; return; }
     }
-    /* Bounded to the same per-message capacity as Muse captions. */
-    size_t len = strnlen(text, is_status ? 16 : 1023);
+    /* E-paper replies may be longer than the 1 KiB speech/caption buffer.
+     * Limit outgoing HTTP size independently, without splitting UTF-8 bytes. */
+    const size_t cap = is_status ? 16 : 8192;
+    size_t len = strnlen(text, cap + 1);
+    if (len > cap) {
+        len = cap;
+        while (len && ((unsigned char)text[len] & 0xc0) == 0x80) --len;
+        ESP_LOGW(TAG, "Pi reply exceeded %u bytes; safely truncated", (unsigned)cap);
+    }
     char *copy = (char *)malloc(len + 1);
     if (!copy) { ESP_LOGW(TAG, "Out of memory copying reply"); return; }
     memcpy(copy, text, len);
