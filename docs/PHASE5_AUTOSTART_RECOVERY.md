@@ -174,3 +174,20 @@ After an actual Raspberry Pi reboot, the user reconnected via SSH and reported:
 - `systemctl show ... -p MainPID -p NRestarts` → **MainPID=1345**, **NRestarts=0**
 
 **Boot persistence and HTTP startup: PASS.** Prior simulated crash recovery: **PASS**. Prior single-instance/pagination unit tests: **PASS**. Live hardware interaction after reboot (OLED/e-paper buttons, new ESP32 reply) has not yet been separately reported and remains a final functional regression check.
+
+## Final full-system physical acceptance — 2026-11-14
+
+User confirmed that after rebooting the Raspberry Pi, they tested **the whole Hey Muse system** and **everything works**. This closes the previously pending physical display and ESP32 communication regression check.
+
+Final Phase 5 status: **COMPLETE — user-verified hardware acceptance**.
+
+- [x] No-GPIO singleton tests and pagination regression tests pass
+- [x] Python dependencies, interpreter, systemd service syntax and account checked
+- [x] systemd enabled and application starts successfully
+- [x] HTTP bridge health response and single process confirmed
+- [x] Controlled restart brings the application back (initial immediate HTTP probe occurred before readiness)
+- [x] Automatic recovery after forced main-process termination: active, NRestarts=1
+- [x] Successful system reboot: service enabled/active, bridge healthy, NRestarts=0
+- [x] Final user-confirmed end-to-end test: system functioning normally after reboot
+
+The tested Phase 5 branch is `feature/phase5-autostart-recovery-2026-11`. Original `backup/phase4c-tested-2026-11` remains intact. No further terminal commands are required for normal boot. The service defaults to a 180-second e-paper refresh interval. This records user-reported acceptance and does not claim independent remote hardware access or exhaustive failure testing.
