@@ -163,3 +163,14 @@ done
 ```
 
 Note that `Type=simple` is not a readiness protocol; avoid interpreting an immediate port refusal as failure while the program is starting. Do not change to `Type=notify` without implementing `sd_notify` in the application.
+
+## Reboot acceptance result — 2026-11-14 (user-observed)
+
+After an actual Raspberry Pi reboot, the user reconnected via SSH and reported:
+
+- `systemctl is-enabled hey-muse-pi.service` → **enabled**
+- `systemctl is-active hey-muse-pi.service` → **active**
+- `curl -fsS http://127.0.0.1:8765/health` → bridge JSON health response, `status: ok` (pasted output interleaved with other lines)
+- `systemctl show ... -p MainPID -p NRestarts` → **MainPID=1345**, **NRestarts=0**
+
+**Boot persistence and HTTP startup: PASS.** Prior simulated crash recovery: **PASS**. Prior single-instance/pagination unit tests: **PASS**. Live hardware interaction after reboot (OLED/e-paper buttons, new ESP32 reply) has not yet been separately reported and remains a final functional regression check.
