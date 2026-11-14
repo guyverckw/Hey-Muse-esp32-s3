@@ -35,3 +35,7 @@ venv/
 build/
 dist/
 *.egg-info/
+
+# Conversation history stored by the live Pi application
+conversation_history.jsonl
+conversation_history.jsonl.*
