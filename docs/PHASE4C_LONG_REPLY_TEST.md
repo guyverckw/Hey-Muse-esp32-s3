@@ -128,3 +128,12 @@ After the corrected firmware rebuild/reflash sequence, user reported the latest 
 - Unicode characters: **3,305** (previous: **1,017**)
 
 **Result:** ESP32-to-Pi forwarding of a message longer than the prior 1,023-byte limit is confirmed by Pi history. Still pending: confirmation the message ends naturally without truncation, live wake-word/Fish Audio/OLED regression results, and full multi-page navigation with the new real reply. The existing TTS 1 KiB buffer is unchanged.
+
+## Physical result — four e-paper pages and speech (2026-11-14)
+
+Following the prior 3,327-byte / 3,305-character Pi message from source `esp32`, the user confirmed:
+
+- All **four pages** of the long AI response were visible on the actual e-paper: **PASS**.
+- Hey Muse **spoke the response in full**, according to the user's listening test: **PASS**.
+
+This is a user-observed hardware acceptance result. It establishes successful long-answer delivery and audible playback for the tested response, despite the code still having a 1 KiB TTS/caption buffer; the precise speech-generation path and generality of full-length TTS are not independently established. Live OLED status regression and broader reliability tests remain to be separately confirmed. Keep the Phase 4c pull request in draft until final verification.
