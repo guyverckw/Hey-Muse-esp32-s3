@@ -49,3 +49,14 @@ The queued-page implementation intentionally does not flash firmware, change har
 - Multiple presses during the cooldown coalesce to the most recent selected page.
 - Pending automatic newest-reply updates may display after manual page browsing once the next cooldown expires.
 - No software change removes the panel's physical refresh time.
+
+## Physical validation — 2026-11-14
+
+User reported all four tests **PASS** on the Raspberry Pi and real e-paper hardware:
+
+- Long response displays multiple pages: PASS
+- RIGHT advances to the next page: PASS
+- Page requests during cooldown are queued: PASS
+- LEFT returns to the previous page: PASS
+
+This is a user-reported real-device result, not automated hardware verification. Python syntax checks, three unit tests and six preview renders also passed before deployment. The 30-second test cooldown is outside Waveshare's recommended 180-second regular-use minimum. The ESP32 long-response forwarding limit remains unresolved.
