@@ -1,0 +1,26 @@
+# Hey Muse Raspberry Pi companion — Phase 5 candidate.
+# Review Python interpreter, username, and paths before installing.
+# Stop the old terminal-launched app first; old versions have no singleton lock.
+[Unit]
+Description=Hey Muse Raspberry Pi OLED and e-paper companion
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=musepi
+Group=musepi
+WorkingDirectory=/home/musepi/hey-muse-display
+Environment=PYTHONUNBUFFERED=1
+# Recommended regular-use value. Override with a drop-in only when explicitly testing.
+Environment=MUSE_EPAPER_REFRESH_SECONDS=180
+ExecStart=/usr/bin/python3 -u /home/musepi/hey-muse-display/muse_pi.py --listen 0.0.0.0 --port 8765
+Restart=on-failure
+RestartSec=10
+# The GPIO/e-paper worker needs time to finish a hardware refresh cleanly.
+KillSignal=SIGINT
+TimeoutStopSec=150
+
+[Install]
+WantedBy=multi-user.target
