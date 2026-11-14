@@ -1,3 +1,4 @@
+#include "muse_pi_bridge.h"
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -286,6 +287,7 @@ static void auto_silence_track(bool hands_free, const int16_t *pcm, bool *speech
 static bool record(bool barge_in, bool hands_free, size_t *held, char *why, size_t cap)
 {
     muse_state_set_mode(MUSE_MODE_LISTENING);
+    muse_pi_bridge_enqueue_status("listening"); /* MUSE_PI_LIVE_STATUS_V1 */
     muse_state_set_progress(0);
     s_rec_n = s_sent = 0;
     s_live = s_tried = false;
@@ -396,6 +398,7 @@ static void go_idle(const char *caption);
 static bool hatch_reply(bool *delivered)
 {
     muse_state_set_mode(MUSE_MODE_THINKING);
+    muse_pi_bridge_enqueue_status("thinking"); /* MUSE_PI_LIVE_STATUS_V1 */
     muse_state_set_caption("SENDING VOICE NOTE");   /* until there's a transcript or reply */
     static int16_t buf[MUSE_AUDIO_CHUNK];
     static const int16_t silence[MUSE_AUDIO_CHUNK];
@@ -451,6 +454,7 @@ static bool hatch_reply(bool *delivered)
             if (!speaking) {
                 speaking = true;
                 muse_state_set_mode(MUSE_MODE_SPEAKING);
+                muse_pi_bridge_enqueue_status("speaking"); /* MUSE_PI_LIVE_STATUS_V1 */
                 ESP_LOGI(TAG, "reply audio after %.2fs", (esp_timer_get_time() - t0) / 1e6);
             }
             muse_state_set_level(muse_audio_level(buf, n));
@@ -482,6 +486,7 @@ static void go_idle(const char *caption)
 {
     muse_state_set_progress(0);
     muse_state_set_mode(MUSE_MODE_IDLE);
+    muse_pi_bridge_enqueue_status("idle"); /* MUSE_PI_LIVE_STATUS_V1 */
     if (!caption) {
         caption = "";
     }
@@ -699,6 +704,7 @@ static bool send_held(bool quiet)
              h->tries + 1);
     if (!quiet) {
         muse_state_set_mode(MUSE_MODE_THINKING);
+        muse_pi_bridge_enqueue_status("thinking"); /* MUSE_PI_LIVE_STATUS_V1 */
         muse_state_set_caption("SENDING SAVED NOTE");
     }
     muse_hatch_turn_begin();
@@ -788,6 +794,7 @@ static bool finish_note(void)
         if (s_live && !fed) {
             /* Hatch is behind (still connecting, say): the rest from the kept note. */
             muse_state_set_mode(MUSE_MODE_THINKING);
+            muse_pi_bridge_enqueue_status("thinking"); /* MUSE_PI_LIVE_STATUS_V1 */
             muse_state_set_caption("SENDING VOICE NOTE");
             fed = feed_rest(s_rec, s_rec_n, &s_sent, false) == FED;
             if (!fed) {
@@ -976,6 +983,7 @@ esp_err_t muse_voice_start(QueueHandle_t queue)
     s_pre = heap_caps_malloc(PRE_CHUNKS * sizeof(pre_chunk_t), MUSE_BIG_CAPS);
     if (!s_pre || muse_audio_init(muse_settings_volume(), muse_settings_mic_gain()) != ESP_OK) {
         muse_state_set_mode(MUSE_MODE_ERROR);
+        muse_pi_bridge_enqueue_status("error"); /* MUSE_PI_LIVE_STATUS_V1 */
         muse_state_set_caption("AUDIO INIT FAILED");
         return ESP_FAIL;
     }

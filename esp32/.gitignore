@@ -52,3 +52,6 @@ __pycache__/
 .gradle/
 .idea/
 local.properties
+
+# Hey Muse Raspberry Pi bridge private configuration
+/components/muse/muse_pi_bridge_config.h

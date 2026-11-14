@@ -1,3 +1,4 @@
+#include "muse_pi_bridge.h"
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -1394,6 +1395,9 @@ static void message_done(int i, const char *final_text)
         }
         muse_hatch_console("message_done", nullptr, "\"msg\":%d,\"bytes\":%u", i, (unsigned)n);
         ESP_LOGI(TAG, "message %s done (%u chars)", m.id, (unsigned)n);
+        const char *pi_reply = (final_text && final_text[0]) ? final_text
+            : (s_turn.texts ? s_turn.texts + i * TEXT_MAX : m.tail);
+        muse_pi_bridge_enqueue(pi_reply);
         return;
     }
     if (!m.len && final_text && final_text[0]) {
@@ -1402,6 +1406,9 @@ static void message_done(int i, const char *final_text)
     if (m.len && m.tts == TTS_NONE) {
         m.tts = TTS_QUEUED;
     }
+        const char *pi_reply = (final_text && final_text[0]) ? final_text
+            : (s_turn.texts ? s_turn.texts + i * TEXT_MAX : m.tail);
+        muse_pi_bridge_enqueue(pi_reply);
     ESP_LOGI(TAG, "message %s done (%u chars)", m.id, (unsigned)m.len);
 }
 
