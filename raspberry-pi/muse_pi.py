@@ -59,6 +59,36 @@ DEMO_REPLY = (
 )
 
 
+
+# Phase 6: OLED drawing state is pure and independent from GPIO/network access.
+OLED_ANIMATION_INTERVAL = 0.5
+OLED_STATES = {"idle", "listening", "thinking", "speaking", "error"}
+
+
+def oled_animation_frame(status: str, elapsed: float) -> tuple[int, ...]:
+    """Tiny changing waveform/dots; empty for READY and error screens."""
+    tick = max(0, int(elapsed / OLED_ANIMATION_INTERVAL))
+    if status == "listening":
+        return ((3, 8, 4), (7, 3, 7), (4, 9, 4))[tick % 3]
+    if status == "thinking":
+        return tuple(1 if i <= tick % 3 else 0 for i in range(3))
+    if status == "speaking":
+        return ((3, 8, 5), (8, 4, 8), (5, 9, 3))[tick % 3]
+    return ()
+
+
+def oled_footer(status: str, new_reply: bool, queued: bool,
+                busy: bool, cooldown: int) -> str:
+    """Show e-paper queue ahead of normal READY, without hiding active AI status."""
+    if status in ("listening", "thinking", "speaking", "error"):
+        return "MUSE: " + status.upper()
+    if queued:
+        return f"EPAPER Q {cooldown}s" if cooldown else "EPAPER QUEUED"
+    if busy:
+        return "EPAPER UPDATING"
+    return "NEW REPLY - KEY2" if new_reply else "MUSE: READY"
+
+
 def project_dir() -> Path:
     return Path.home() / "hey-muse-display"
 
@@ -520,6 +550,7 @@ def run_app(inbox: Inbox, bind: str, port: int):
     history_index = -1  # -1 means the newest saved reply
     message = "Ready"
     last_redraw = 0.0
+    oled_last_frame = -1
     new_reply = False
     live_status = "idle"
     live_status_at = time.monotonic()
@@ -546,26 +577,40 @@ def run_app(inbox: Inbox, bind: str, port: int):
         return DEMO_REPLY, "DEMO RESPONSE", "SAMPLE ONLY"
 
     def draw_oled():
+        nonlocal oled_last_frame
+        now = time.monotonic()
+        frame = int(now / OLED_ANIMATION_INTERVAL)
+        oled_last_frame = frame
+        # E-paper worker never draws the OLED. Main loop owns every screen update.
         with canvas(oled) as draw:
             draw.rectangle((0, 0, 127, 63), outline="white")
-            draw.text((32, 2), "HEY MUSE", fill="white")
+            draw.text((16, 2), "HEY MUSE", fill="white")
+            # Status animation is confined to the title line (right edge).
+            bars = oled_animation_frame(live_status, now)
+            if live_status == "thinking":
+                for idx, on in enumerate(bars):
+                    if on:
+                        draw.ellipse((101 + 7 * idx, 7, 103 + 7 * idx, 9), fill="white")
+            elif bars:
+                for idx, h in enumerate(bars):
+                    x = 103 + idx * 7
+                    draw.line((x, 6 - h // 2, x, 6 + h // 2), fill="white")
+            elif live_status == "error":
+                draw.text((112, 1), "!", fill="white")
+            else:
+                draw.ellipse((113, 5, 118, 10), outline="white", fill="white")
             draw.line((4, 16, 123, 16), fill="white")
-            draw.text((4, 19), "> " + MENU[selected], fill="white")
+            draw.text((4, 19), ("> " + MENU[selected])[:20], fill="white")
             text, heading, _ = current()
             pages = paginate(text, heading=heading)
-            if view == "reply":
-                subtitle = f"Reply {len(inbox.messages)} | {page + 1}/{len(pages)}"
-            else:
-                subtitle = f"{view} | {page + 1}/{len(pages)}"
+            subtitle = (f"Reply {len(inbox.messages)} | {page + 1}/{len(pages)}"
+                        if view == "reply" else f"{view} | {page + 1}/{len(pages)}")
             if pending_manual_refresh:
                 subtitle += " Q"
             draw.text((4, 33), subtitle[:21], fill="white")
-            # Status line is independent of manual menu and e-paper view.
-            if live_status != "idle":
-                status = "MUSE: " + live_status.upper()
-            else:
-                status = ("NEW REPLY - KEY2" if new_reply else "MUSE: READY")
-            draw.text((4, 47), status[:20], fill="white")
+            footer = oled_footer(live_status, new_reply, pending_manual_refresh,
+                                 epaper_future is not None, inbox.remaining())
+            draw.text((4, 47), footer[:20], fill="white")
 
     def epaper_job(black, yellow):
         """Hardware operations only. GPIO objects remain within this one process.
@@ -756,8 +801,13 @@ def run_app(inbox: Inbox, bind: str, port: int):
                     # refresh() persists its cooldown before accessing e-paper.
                     # Keep pending to retry after the cooldown; do not kill the UI.
                     print(f"Automatic e-paper refresh failed: {exc!r}", flush=True)
-            if time.monotonic() - last_redraw > 1.0:
-                last_redraw = time.monotonic()
+            # Update animated states twice per second; queued countdown at the
+            # same pace. No e-paper operations are initiated by OLED animation.
+            now = time.monotonic()
+            if (int(now / OLED_ANIMATION_INTERVAL) != oled_last_frame
+                    and (live_status in ("listening", "thinking", "speaking")
+                         or pending_manual_refresh or epaper_future is not None)):
+                draw_oled()
             time.sleep(0.03)
     except (KeyboardInterrupt, StopIteration):
         print("Stopping Hey Muse Pi companion")
