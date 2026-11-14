@@ -137,3 +137,16 @@ Following the prior 3,327-byte / 3,305-character Pi message from source `esp32`,
 - Hey Muse **spoke the response in full**, according to the user's listening test: **PASS**.
 
 This is a user-observed hardware acceptance result. It establishes successful long-answer delivery and audible playback for the tested response, despite the code still having a 1 KiB TTS/caption buffer; the precise speech-generation path and generality of full-length TTS are not independently established. Live OLED status regression and broader reliability tests remain to be separately confirmed. Keep the Phase 4c pull request in draft until final verification.
+
+## Final OLED regression confirmation — 2026-11-14
+
+User confirmed the OLED works properly with the updated Phase 4c ESP32 firmware, including the expected live conversation-status behaviour. Combined with previously reported results, the tested hardware acceptance criteria are now met:
+
+- ESP-IDF S3N build successful — **PASS**
+- ESP32-sourced long reply, 3,327 UTF-8 bytes / 3,305 characters, received by Pi — **PASS**
+- All four physical e-paper pages displayed — **PASS**
+- Spoken response heard in full — **PASS (user-observed)**
+- OLED status indicators functioning normally — **PASS (user-observed)**
+- Phase 4b LEFT/RIGHT queued pagination — **previously hardware-tested PASS**
+
+**Phase 4c functional status: COMPLETE (hardware acceptance based on reported tests).** This does not imply that every possible message length or full-length TTS path has been stress-tested. The 8,192-byte transmission ceiling and independent short TTS/caption buffer remain documented limitations. Source branch is retained independently of the original working backup; the pull request may still require code review before merging.
