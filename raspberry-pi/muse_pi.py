@@ -19,6 +19,7 @@ from collections import deque
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import hmac
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -68,6 +69,27 @@ def config_dir() -> Path:
 
 def token_path() -> Path:
     return config_dir() / "bridge_token"
+
+
+def acquire_instance_lock():
+    """Allow exactly one Phase 5 Pi application (including manual launches).
+
+    The kernel releases this advisory lock automatically on process exit, even
+    after a crash. Older, pre-Phase-5 processes do not use it: stop them first.
+    """
+    directory = config_dir()
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path = directory / "muse_pi.lock"
+    fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        raise SystemExit("Hey Muse Pi is already running (instance lock held)")
+    except Exception:
+        os.close(fd)
+        raise
+    return fd
 
 
 def create_token_if_needed() -> str:
@@ -766,11 +788,15 @@ def main():
     if args.send_test:
         send_test(args.port, create_token_if_needed())
         return
-    inbox = Inbox(project_dir())
-    if args.server_only:
-        run_server_only(inbox, args.listen, args.port)
-    else:
-        run_app(inbox, args.listen, args.port)
+    lock_fd = acquire_instance_lock()
+    try:
+        inbox = Inbox(project_dir())
+        if args.server_only:
+            run_server_only(inbox, args.listen, args.port)
+        else:
+            run_app(inbox, args.listen, args.port)
+    finally:
+        os.close(lock_fd)
 
 
 if __name__ == "__main__":
