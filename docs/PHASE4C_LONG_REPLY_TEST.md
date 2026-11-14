@@ -103,3 +103,18 @@ Keep `backup/full-working-2026-11` and the proven Phase 4b Pi code available. If
 - [ ] LEFT/RIGHT queued navigation still works
 - [ ] OLED live-status transitions still work
 - [ ] No token or credential is committed
+
+## Regression found during first physical test
+
+The first user-reported long-answer test on 2026-11-14 returned exactly **1,023 UTF-8 bytes** / 1,017 characters from source `esp32`. The reply was incomplete. The earlier patch changed the HTTP bridge limit but **missed the voice-specific fallback** within `message_done()`, which could still send the short 1,024-byte caption text buffer. The final event field could also be shorter than accumulated streamed content.
+
+Follow-up fix commits `aee058d` and `092b856` now select the longer available representation for the Pi in **both** voice and text turns, and log only byte lengths (no private message text). A **new firmware build and flash** are required; the earlier successfully built and flashed firmware does not contain these corrections.
+
+After flashing the corrected build, for a real voice interaction inspect serial messages:
+- `Pi reply bytes stream=... final=... selected=... (cap=8192)`
+- `Pi reply queued: ... UTF-8 bytes`
+- `Reply delivered to Raspberry Pi (202)` or a relevant HTTP error
+
+Compare the selected and queued byte counts with the most recent Pi history entry (check the **source is esp32**). Do not paste private reply content, credentials or tokens into diagnostics.
+
+**Separate scope:** Fish Audio still reads from the 1 KiB speech buffer; spoken audio may stop early even when a full multi-page e-paper reply is delivered. Do not mark full-length TTS solved by this fix. If the **server itself** terminates generation early, that is a separate issue from the Pi forwarding limit.
