@@ -4,6 +4,8 @@ This directory contains the Raspberry Pi 3B companion code backed up from the wo
 
 **Full recovery instructions:** [Hey Muse Recovery Guide](../docs/HEY_MUSE_RECOVERY.md).
 
+**Phase 5 optional autostart:** [Systemd service, tests and rollback](../docs/PHASE5_AUTOSTART_RECOVERY.md). The systemd service is not enabled simply by cloning this repository.
+
 ## Source files
 
 - `muse_pi.py`: live HTTP bridge, OLED status display, e-paper rendering and button navigation.
