@@ -101,7 +101,8 @@ static const char *TAG = "muse_chat_session";
 #define IN_BYTES (MIC_RATE * 2 * 8)        /* 8 s of mic backlog while connecting */
 #define OUT_BYTES (MIC_RATE * 2 * 2)       /* 2 s of decoded reply */
 #define EV_TEXT 72
-#define TEXT_MAX 1024                      /* a message's text, for captions timed to its speech */
+#define TEXT_MAX 1024                      /* existing spoken captions / Fish Audio TTS */
+#define PI_REPLY_MAX_BYTES 8192             /* independent full-text e-paper buffer */
 #define SPEECH_CHARS_PER_S 14              /* until the speech's length is known */
 #define TEXT_CHARS_PER_S 16                /* speaker off: reading pace, a little over speech */
 #define TEXT_HOLD_S 2                      /* speaker off: how long a message's last lines stay up */
@@ -200,6 +201,9 @@ enum tts_t : uint8_t { TTS_NONE, TTS_QUEUED, TTS_ACTIVE, TTS_FINISHED };
 struct msg_t {
     char id[80];
     size_t len;              /* reply text length so far */
+    char *pi_full;           /* long e-paper reply; allocated on first delta */
+    size_t pi_len;           /* bytes stored, excluding NUL */
+    bool pi_clipped;        /* exceeded forwarding limit */
     char tail[128];          /* its last characters, for the caption */
     bool done;
     tts_t tts;
@@ -995,6 +999,13 @@ static bool turn_start(uint32_t gen, bool text)
             turn_finish();
         }
     }
+    /* Full Pi reply buffers belong to the previous turn, never to the next. */
+    for (auto &msg : s_turn.msgs) {
+        if (msg.pi_full) {
+            heap_caps_free(msg.pi_full);
+            msg.pi_full = nullptr;
+        }
+    }
     uint8_t *chunk = s_turn.chunk, *mp3 = s_turn.mp3, *note = s_turn.note;
     char *texts = s_turn.texts;
     s_turn = turn_t{};
@@ -1334,8 +1345,43 @@ static int bind_msg(const char *id, cJSON *payload)
     return s_turn.nmsgs++;
 }
 
+/* Store up to 8 KiB of Unicode reply independently of the 1 KiB speech buffer.
+ * Incoming JSON text chunks are UTF-8 strings. Never cut through a character
+ * when the e-paper capacity is reached. */
+static size_t pi_utf8_prefix(const char *s, size_t n)
+{
+    while (n && ((unsigned char)s[n] & 0xc0) == 0x80) --n;
+    return n;
+}
+
+static void append_pi_text(msg_t &m, const char *text)
+{
+    if (!text || !text[0] || m.pi_clipped) return;
+    if (!m.pi_full) {
+        m.pi_full = static_cast<char *>(psram_alloc(PI_REPLY_MAX_BYTES + 1));
+        if (!m.pi_full) {
+            ESP_LOGW(TAG, "No PSRAM for full Pi reply; using caption fallback");
+            m.pi_clipped = true;
+            return;
+        }
+        m.pi_full[0] = '\0';
+    }
+    size_t len = strlen(text);
+    size_t room = PI_REPLY_MAX_BYTES - m.pi_len;
+    size_t copy = len <= room ? len : pi_utf8_prefix(text, room);
+    if (copy) memcpy(m.pi_full + m.pi_len, text, copy);
+    m.pi_len += copy;
+    m.pi_full[m.pi_len] = '\0';
+    if (copy != len) {
+        m.pi_clipped = true;
+        ESP_LOGW(TAG, "Pi reply exceeded %u bytes; later characters omitted",
+                 (unsigned)PI_REPLY_MAX_BYTES);
+    }
+}
+
 static void append_text(msg_t &m, const char *text)
 {
+    append_pi_text(m, text);
     size_t add = strlen(text);
     if (s_turn.texts) {
         char *full = s_turn.texts + (&m - s_turn.msgs) * TEXT_MAX;
@@ -1396,7 +1442,7 @@ static void message_done(int i, const char *final_text)
         muse_hatch_console("message_done", nullptr, "\"msg\":%d,\"bytes\":%u", i, (unsigned)n);
         ESP_LOGI(TAG, "message %s done (%u chars)", m.id, (unsigned)n);
         const char *pi_reply = (final_text && final_text[0]) ? final_text
-            : (s_turn.texts ? s_turn.texts + i * TEXT_MAX : m.tail);
+            : (m.pi_full ? m.pi_full : (s_turn.texts ? s_turn.texts + i * TEXT_MAX : m.tail));
         muse_pi_bridge_enqueue(pi_reply);
         return;
     }
@@ -1477,6 +1523,7 @@ static void on_event(cJSON *line)
         if (text && text[0] && s_turn.text) {
             mark(M_TEXT);
             m.len += strlen(text);
+            append_pi_text(m, text);
             muse_hatch_console("text", text, "\"msg\":%d", i);
         } else if (text && text[0]) {
             mark(M_TEXT);
