@@ -587,6 +587,7 @@ def run_app(inbox: Inbox, bind: str, port: int):
     live_status_at = time.monotonic()
     pi_link = pi_link_state()
     next_link_check = time.monotonic() + 5.0
+    last_esp_indicator = "-"
     # Expire stale transient statuses if Wi-Fi drops or ESP32 reboots.
     LIVE_STATUS_TIMEOUT = 90.0
     # AUTO_EPAPER_REFRESH_PATCH_V1: pending latest reply, handled in the main loop.
@@ -611,10 +612,11 @@ def run_app(inbox: Inbox, bind: str, port: int):
         return DEMO_REPLY, "DEMO RESPONSE", "SAMPLE ONLY"
 
     def draw_oled():
-        nonlocal oled_last_frame
+        nonlocal oled_last_frame, last_esp_indicator
         now = time.monotonic()
         frame = int(now / OLED_ANIMATION_INTERVAL)
         oled_last_frame = frame
+        last_esp_indicator = "R" if esp32_seen_recently(server.last_esp32_at, now) else "-"
         # E-paper worker never draws the OLED. Main loop owns every screen update.
         with canvas(oled) as draw:
             draw.rectangle((0, 0, 127, 63), outline="white")
@@ -622,6 +624,11 @@ def run_app(inbox: Inbox, bind: str, port: int):
             # W/E means a local interface has link; it does not prove Internet
             # access or that the ESP32 is reachable.
             draw.text((89, 2), pi_link, fill="white")
+            # R = an ESP32 message received within 90s; - = none recently.
+            # This is message recency, never proof of a persistent connection.
+            esp_indicator = ("R" if esp32_seen_recently(server.last_esp32_at, now)
+                             else "-")
+            draw.text((97, 2), esp_indicator, fill="white")
             # Status animation is confined to the title line (right edge).
             bars = oled_animation_frame(live_status, now)
             if live_status == "thinking":
@@ -843,7 +850,8 @@ def run_app(inbox: Inbox, bind: str, port: int):
             if now >= next_link_check:
                 next_link_check = now + 5.0
                 updated_link = pi_link_state()
-                if updated_link != pi_link:
+                current_esp = "R" if esp32_seen_recently(server.last_esp32_at, now) else "-"
+                if updated_link != pi_link or current_esp != last_esp_indicator:
                     pi_link = updated_link
                     draw_oled()
             # Update animated states twice per second; queued countdown at the
