@@ -99,3 +99,15 @@ Never delete `conversation_history.jsonl`, `refresh_state.json`, or the bearer t
 - [ ] Menu position and button operation correct
 - [ ] E-paper pagination, 180-second cooldown and Fish Audio intact
 - [ ] systemd service continues running normally
+
+## Pi pre-deployment test results — 2026-11-15
+
+The user fetched and switched to the Phase 6b branch on the Raspberry Pi and reported:
+
+- `python3 -m py_compile muse_pi.py`: **PASS**
+- `test_network_menu.py`: **4 tests PASS**
+- `test_oled_status.py`: **5 tests PASS**
+- `test_single_instance.py`: **2 tests PASS**
+- `test_pagination.py`: **3 tests PASS**
+
+Total: **14 software tests PASS**. Physical deployment and regression checks remain pending; preserve a dated copy of the running Phase 6a script before stopping the systemd unit to update the working program.
