@@ -108,3 +108,26 @@ The first firmware build command (`tools/muse/board.sh build s3n` from repositor
 - [ ] Test short speech, audible complete multi-page speech and cancellation
 
 **Do not commit a flash dump to GitHub:** it can contain tokens, passwords and paired-device secrets.
+
+## Verified firmware backup — 2026-11-15
+
+User successfully completed a **full ESP32-S3 flash read** before attempting the new TTS firmware:
+
+- Board detected over `/dev/cu.usbmodem14201`, ESP32-S3 revision v0.2, 8 MB embedded PSRAM, 16 MB flash.
+- `python -m esptool --chip esp32s3 -p "$PORT" -b 460800 read-flash 0 ALL ...` finished without errors.
+- Exact read: **16,777,216 bytes** from flash offset `0x00000000`.
+- Private local recovery image: `~/Documents/ESP32/MUSE/firmware-backups/hey-muse-before-long-tts.bin`.
+- User ran `shasum -a 256`; SHA-256 recorded locally as `30ecd38ccc8870a70032a1bc49c7c48dde555cbd4cc35720ba422edf01b4366e`. Never commit the flash image or credentials.
+- **Backup passed; new firmware not yet flashed or hardware tested.**
+
+### Restore reference (only if needed)
+
+With the device port detected and confirmed as the intended board, run from the Mac's `esp32` directory:
+
+```bash
+PORT="$(python tools/muse/ports.py s3n)"
+python -m esptool --chip esp32s3 -p "$PORT" -b 460800 \
+  write-flash 0x0 ~/Documents/ESP32/MUSE/firmware-backups/hey-muse-before-long-tts.bin
+```
+
+This writes the complete original flash image, including credentials and provisioning data, to **the same board**. Do not run unless recovering. It will overwrite the firmware currently installed.
