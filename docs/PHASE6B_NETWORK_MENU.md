@@ -155,3 +155,17 @@ Code inspection found **two independent known limits**:
 2. `esp32/components/muse/muse_chat_session.cpp` uses `TEXT_MAX=1024` for spoken caption/Fish Audio input, while `PI_REPLY_MAX_BYTES=8192` independently sends longer replies to the Pi. The `start_tts()` path still passes the 1 KB caption text to `muse_fish_tts_generate()`. This is a plausible deterministic cause of long e-paper answers exceeding spoken text. It is not caused by the Pi OLED network indicators. Longer TTS remains a separate ESP32 firmware enhancement; no untested changes have been deployed.
 
 **Phase 6b acceptance:** OLED menu reported working, but end-to-end long-reply speech and requested 30-second test mode remain to be addressed / confirmed. Keep the previous Phase 6a backup available. Before any TTS firmware changes, design bounded UTF-8-safe chunking, account for Fish Audio request costs, and verify end-of-audio handling on hardware.
+
+## Corrected Phase 6b live runtime and refresh override logs — 2026-11-15
+
+User shared journal/systemd output from corrected Phase 6b deployment:
+
+- Service `active`; `MainPID=10220`, `NRestarts=0` after 15 seconds.
+- Local `/health` returned `{"status":"ok","service":"hey-muse-pi-bridge"}`.
+- Pi logs show authenticated ESP32 status and reply HTTP requests returning `202`, a received reply, and completed e-paper refreshes.
+- Under 180-second configuration: e-paper job started 17:26:31 and finished 17:27:18 (~47s); page request at 17:27:45 reported 106s remaining; queued refresh started 17:29:33 and finished 17:30:20. This is consistent with cooldown measured from refresh **start**, not completion.
+- A temporary systemd drop-in `MUSE_EPAPER_REFRESH_SECONDS=30` was created. `systemctl show ... -p Environment` confirmed `MUSE_EPAPER_REFRESH_SECONDS=30` after daemon reload and restart, but the included journal output did **not** show the new application's startup cooldown line or a new 30-second physical navigation test.
+- User removed `/etc/systemd/system/hey-muse-pi.service.d/refresh-test.conf`, reloaded systemd and restarted the service. Expected fallback: 180 seconds; final post-removal environment still unverified by logs.
+- User previously reported long Fish Audio speech ending before the longer e-paper answer finishes. Code inspection identified independent 1,024-byte TTS input vs 8,192-byte Pi forwarding; this remains a separate ESP32 firmware limitation and is **not resolved** by the Pi service override.
+
+**Status:** corrected Phase 6b startup stability verified; long-voice and 30-second physical e-paper behaviour not marked accepted. Avoid changing e-paper settings permanently for rapid refresh testing.
