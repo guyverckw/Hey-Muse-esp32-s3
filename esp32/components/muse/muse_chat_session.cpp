@@ -75,6 +75,7 @@ extern "C" {
 #include "muse_wifi.h"
 }
 #include "muse_chat_priv.h"
+#include "muse_tts_chunk.h"
 
 #include <xplat/noise/core/ClientSession.h>
 #include <xplat/noise/core/PsaCryptoBackend.h>
@@ -101,7 +102,8 @@ static const char *TAG = "muse_chat_session";
 #define IN_BYTES (MIC_RATE * 2 * 8)        /* 8 s of mic backlog while connecting */
 #define OUT_BYTES (MIC_RATE * 2 * 2)       /* 2 s of decoded reply */
 #define EV_TEXT 72
-#define TEXT_MAX 1024                      /* existing spoken captions / Fish Audio TTS */
+#define TEXT_MAX 1024                      /* existing visible caption text buffer */
+#define FISH_TTS_CHUNK_BYTES 700          /* bounded Fish Audio request; UTF-8 split */
 #define PI_REPLY_MAX_BYTES 8192             /* independent full-text e-paper buffer */
 #define SPEECH_CHARS_PER_S 14              /* until the speech's length is known */
 #define TEXT_CHARS_PER_S 16                /* speaker off: reading pace, a little over speech */
@@ -115,6 +117,7 @@ static const char *TAG = "muse_chat_session";
 #define FINAL_TIMEOUT_US (15 * 1000000LL)  /* release -> final transcript */
 #define REPLY_TIMEOUT_US (60 * 1000000LL)  /* chat posted -> first assistant message */
 #define TURN_CAP_US (180 * 1000000LL)
+#define LONG_SPEECH_CAP_US (12 * 60 * 1000000LL) /* long spoken replies need more than 3 min */
 #define SETTLE_US (3 * 1000000LL)          /* quiet period that ends a turn */
 #define BUSY_HOLD_US (20 * 1000000LL)      /* how long a busy agent keeps it open */
 #define TEXT_REPLY_TIMEOUT_US (5 * 60 * 1000000LL)   /* typed turns: agents can work a while */
@@ -1666,24 +1669,61 @@ static void start_tts(void)
             ESP_LOGI(TAG, "generating Fish Audio speech for message %s", m.id);
             show_reply_start(m);
 
+            // The separate Pi reply buffer retains substantially more of the
+            // answer than the 1 KiB OLED caption buffer. Speak the former
+            // in sequential bounded requests without copying all 8 KiB to
+            // internal RAM. The PCM callback honours turn cancellation.
+            const char *speech = (m.pi_full && m.pi_full[0]) ? m.pi_full : text;
+            const size_t speech_len = strlen(speech);
+            size_t offset = 0;
+            unsigned chunks = 0;
+            esp_err_t err = ESP_OK;
+            char piece[FISH_TTS_CHUNK_BYTES + 1];
             tts_output_t output = { i, s_turn.gen };
-            esp_err_t err = muse_fish_tts_generate(api_key, voice_id, text, queue_reply_pcm, &output);
+            while (offset < speech_len) {
+                if (output.gen != s_gen.load()) {
+                    break;
+                }
+                const size_t end = muse_tts_chunk_end(speech, offset, FISH_TTS_CHUNK_BYTES);
+                if (end <= offset || end - offset > FISH_TTS_CHUNK_BYTES) {
+                    err = ESP_ERR_INVALID_SIZE;
+                    break;
+                }
+                memcpy(piece, speech + offset, end - offset);
+                piece[end - offset] = '\0';
+                ESP_LOGI(TAG, "Fish Audio chunk %u: bytes %u-%u of %u",
+                         chunks + 1, (unsigned)offset, (unsigned)end,
+                         (unsigned)speech_len);
+                err = muse_fish_tts_generate(api_key, voice_id, piece, queue_reply_pcm, &output);
+                if (err != ESP_OK) {
+                    break; // Never skip a failed segment and speak out of order.
+                }
+                offset = end;
+                ++chunks;
+            }
             wipe_key(api_key, sizeof(api_key));
             if (output.gen != s_gen.load()) {
-                return;
+                return; // A newer voice turn superseded this one.
             }
-            if (err == ESP_OK) {
+            if (err == ESP_OK && offset == speech_len) {
                 m.tts = TTS_FINISHED;
                 s_turn.tts_msg = -1;
-                ESP_LOGI(TAG, "Fish Audio speech ready (%u frames)", (unsigned)m.pcm_frames);
+                ESP_LOGI(TAG, "Fish Audio completed %u chunks, %u bytes, %u frames",
+                         chunks, (unsigned)speech_len, (unsigned)m.pcm_frames);
             } else if (m.pcm_frames) {
                 m.tts = TTS_FINISHED;
                 s_turn.tts_msg = -1;
-                ESP_LOGW(TAG, "Fish Audio speech stopped after %u frames", (unsigned)m.pcm_frames);
+                ESP_LOGW(TAG, "Fish Audio incomplete: %u/%u text bytes, %u PCM frames (%s)",
+                         (unsigned)offset, (unsigned)speech_len,
+                         (unsigned)m.pcm_frames, esp_err_to_name(err));
             } else {
-                m.pcm_frames = (uint32_t)(utf8_character_count(text) * MIC_RATE / TEXT_CHARS_PER_S);
+                m.pcm_frames = (uint32_t)(utf8_character_count(speech) * MIC_RATE / TEXT_CHARS_PER_S);
                 s_turn.silent = true;
                 ESP_LOGW(TAG, "Fish Audio speech unavailable (%s); showing captions", esp_err_to_name(err));
+            }
+            if (m.pi_clipped) {
+                ESP_LOGW(TAG, "Speech source clipped at Pi reply limit %u bytes",
+                         (unsigned)PI_REPLY_MAX_BYTES);
             }
             return;
         }
@@ -1832,7 +1872,21 @@ static void check_turn(void)
         return;
     }
     bool text = s_turn.text;
-    if (t - s_turn.start_us > (text ? TEXT_TURN_CAP_US : TURN_CAP_US)) {
+    // A long Fish Audio sequence can legitimately take longer than the
+    // original three-minute voice cap. Extend the cap only while speech is
+    // queued/active or when speech completed after that deadline; retain the
+    // original cap for a stalled conversation with no speech.
+    bool speech_in_progress = false;
+    bool long_speech_completed = false;
+    for (int i = 0; i < s_turn.nmsgs; i++) {
+        if (s_turn.msgs[i].tts == TTS_ACTIVE || s_turn.msgs[i].tts == TTS_QUEUED)
+            speech_in_progress = true;
+        if (s_turn.msgs[i].tts == TTS_FINISHED && s_turn.msgs[i].pcm_frames)
+            long_speech_completed = true;
+    }
+    const int64_t cap = text ? TEXT_TURN_CAP_US :
+        (speech_in_progress || long_speech_completed ? LONG_SPEECH_CAP_US : TURN_CAP_US);
+    if (t - s_turn.start_us > cap) {
         ESP_LOGW(TAG, "turn hit the time cap");
         turn_done(false);
         return;
