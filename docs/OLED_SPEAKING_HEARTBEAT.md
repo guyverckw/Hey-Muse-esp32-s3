@@ -50,3 +50,19 @@ tools/muse/board.sh flash s3n
 5. No unexpected ESP32 or Pi resets, no speech omissions.
 
 **No hardware success should be recorded before the user's testing.**
+
+## User-requested e-paper policy change — 2026-11-15
+
+The user explicitly requested the Raspberry Pi's e-paper refresh cooldown be set to **30 seconds instead of 180 seconds**, as an ongoing configuration rather than a one-time supervised test. This is a **Pi-side service configuration** independent of ESP32 TTS and the OLED speaking-heartbeat firmware.
+
+Recommended live installation: create the local systemd drop-in at
+`/etc/systemd/system/hey-muse-pi.service.d/refresh.conf`:
+
+```ini
+[Service]
+Environment=MUSE_EPAPER_REFRESH_SECONDS=30
+```
+
+Apply using `sudo systemctl daemon-reload` then, after the e-paper finishes updating, `sudo systemctl restart hey-muse-pi.service`. Verify `systemctl show hey-muse-pi.service -p Environment` reports 30 and the new journal startup reports `Refresh cooldown: 30s.` The service-unit repository default is unchanged at 180 seconds; the host drop-in overrides it **persistently across reboots**. This host-local configuration must be retained if rebuilding the Pi installation.
+
+**Important:** The user's prior panel update took ~47 seconds. A 30-second between-starts cooldown does NOT imply a completed image every 30 seconds; updates are serialised and take hardware time. Frequent full-screen tricolour e-paper refreshes may increase wear; consider restoring the conservative 180-second setting for unsupervised long-term use. The requested live override is not yet confirmed applied on the user's Pi.
