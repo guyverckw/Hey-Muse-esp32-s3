@@ -111,3 +111,13 @@ The user fetched and switched to the Phase 6b branch on the Raspberry Pi and rep
 - `test_pagination.py`: **3 tests PASS**
 
 Total: **14 software tests PASS**. Physical deployment and regression checks remain pending; preserve a dated copy of the running Phase 6a script before stopping the systemd unit to update the working program.
+
+## Startup regression found during first physical deployment — 2026-11-15
+
+The user reported the OLED showing the menu for about 1 second, going blank for several seconds, and repeating. This is consistent with the systemd restart loop. Source inspection located the issue: the UI loop compared `now >= next_link_check` **before** executing `now = time.monotonic()` on its first iteration. This raises `UnboundLocalError`, and the service then restarts. This root cause is derived from source inspection; the user has not yet supplied `journalctl` confirming the exact exception.
+
+**Immediate recovery:** Stop `hey-muse-pi.service`, restore the latest local `muse_pi.before_phase6b_*.py` backup, recompile, and restart systemd. Do not change history files, credentials, or the ESP32.
+
+**Development fix:** commit `dbc5ae2` moves monotonic clock assignment above the network check. Follow-on commit `f979f15` adds a focused AST regression test ensuring the main UI loop initialises `now` before evaluating network timers.
+
+**Status: deployment FAILED on initial Phase 6b version. Code fix prepared in branch; NOT YET VERIFIED on Raspberry Pi.** After recovery, obtain the last 40 journal entries if the service still restarts. Do not replace the running, recovered Phase 6a code until the updated tests pass and the user is ready to retry a controlled deployment.
