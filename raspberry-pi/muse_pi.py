@@ -845,6 +845,9 @@ def run_app(inbox: Inbox, bind: str, port: int):
                     # refresh() persists its cooldown before accessing e-paper.
                     # Keep pending to retry after the cooldown; do not kill the UI.
                     print(f"Automatic e-paper refresh failed: {exc!r}", flush=True)
+            # Capture time before any link/status checks; otherwise the first
+            # loop iteration crashes with UnboundLocalError and systemd restarts.
+            now = time.monotonic()
             # Read local kernel network link state at low frequency; no DNS,
             # ping, remote HTTP, or blocking network operations on the UI.
             if now >= next_link_check:
@@ -856,7 +859,6 @@ def run_app(inbox: Inbox, bind: str, port: int):
                     draw_oled()
             # Update animated states twice per second; queued countdown at the
             # same pace. No e-paper operations are initiated by OLED animation.
-            now = time.monotonic()
             if (int(now / OLED_ANIMATION_INTERVAL) != oled_last_frame
                     and (live_status in ("listening", "thinking", "speaking")
                          or pending_manual_refresh or epaper_future is not None)):
