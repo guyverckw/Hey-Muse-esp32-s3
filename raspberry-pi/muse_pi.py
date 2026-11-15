@@ -590,6 +590,10 @@ def run_app(inbox: Inbox, bind: str, port: int):
     last_esp_indicator = "-"
     # Expire stale transient statuses if Wi-Fi drops or ESP32 reboots.
     LIVE_STATUS_TIMEOUT = 90.0
+    # A multi-segment Fish Audio response can last much longer than 90s.
+    # The ESP32 explicitly sends "idle" when playback finishes, so let that
+    # event end SPEAKING normally. Keep a longer crash/disconnect fail-safe.
+    SPEAKING_STATUS_TIMEOUT = 15 * 60.0
     # AUTO_EPAPER_REFRESH_PATCH_V1: pending latest reply, handled in the main loop.
     pending_auto_refresh = False
     # Manual page changes should survive both the cooldown and a busy panel.
@@ -793,9 +797,12 @@ def run_app(inbox: Inbox, bind: str, port: int):
                 live_status = newest_status
                 live_status_at = time.monotonic()
                 draw_oled()
-            elif live_status != "idle" and time.monotonic() - live_status_at > LIVE_STATUS_TIMEOUT:
-                live_status = "idle"
-                draw_oled()
+            elif live_status != "idle":
+                timeout = (SPEAKING_STATUS_TIMEOUT if live_status == "speaking"
+                           else LIVE_STATUS_TIMEOUT)
+                if time.monotonic() - live_status_at > timeout:
+                    live_status = "idle"
+                    draw_oled()
 
             received = inbox.collect()
             if received:
