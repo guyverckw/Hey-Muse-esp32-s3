@@ -131,3 +131,16 @@ The user restored the live application from the pre-Phase-6b Phase 6a backup and
 - [ ] Controlled Phase 6b redeployment and physical acceptance
 
 **Live system is back on the user-tested Phase 6a version. Do not overwrite it until the corrected development branch passes Pi tests.**
+
+## Corrected-source software retest — 2026-11-15
+
+After recovering the working Phase 6a system, the user updated the Phase 6b source checkout and tested the corrected implementation on their Raspberry Pi:
+
+- `python3 -m py_compile muse_pi.py`: **PASS**
+- `test_network_menu.py`: **5 tests PASS**
+- `test_oled_status.py`: **5 tests PASS**
+- `test_single_instance.py`: **2 tests PASS**
+- `test_pagination.py`: **3 tests PASS**
+- `grep` confirmed `now = time.monotonic()` on line 850 before `if now >= next_link_check:` on line 853.
+
+**15 tests PASS plus startup fix verified in checked-out source.** This is software validation only; corrected Phase 6b has not yet been redeployed or validated against hardware. Retain Phase 6a backup and inspect systemd restart count / application logs after the next controlled deployment.
