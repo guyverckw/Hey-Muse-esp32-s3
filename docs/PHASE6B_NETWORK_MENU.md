@@ -169,3 +169,13 @@ User shared journal/systemd output from corrected Phase 6b deployment:
 - User previously reported long Fish Audio speech ending before the longer e-paper answer finishes. Code inspection identified independent 1,024-byte TTS input vs 8,192-byte Pi forwarding; this remains a separate ESP32 firmware limitation and is **not resolved** by the Pi service override.
 
 **Status:** corrected Phase 6b startup stability verified; long-voice and 30-second physical e-paper behaviour not marked accepted. Avoid changing e-paper settings permanently for rapid refresh testing.
+
+## Refresh override restoration verified — 2026-11-15
+
+User supplied post-rollback output:
+
+- `systemctl show hey-muse-pi.service -p Environment` → `PYTHONUNBUFFERED=1 MUSE_EPAPER_REFRESH_SECONDS=180`.
+- Previous process PID 10840 logged `Refresh cooldown: 30s.` on startup at 18:50:19, then stopped cleanly at 18:52:45–18:52:46.
+- Replacement process PID 11038 started at 18:52:46 and logged `Refresh cooldown: 180s.` at 18:52:48.
+
+**PASS: 30-second temporary override removed and 180-second service/application cooldown restored.** This is independent of the ESP32 Fish Audio long-reply cutoff, which remains to be addressed.
