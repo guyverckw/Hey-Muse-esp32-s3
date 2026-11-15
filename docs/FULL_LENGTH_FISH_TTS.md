@@ -131,3 +131,16 @@ python -m esptool --chip esp32s3 -p "$PORT" -b 460800 \
 ```
 
 This writes the complete original flash image, including credentials and provisioning data, to **the same board**. Do not run unless recovering. It will overwrite the firmware currently installed.
+
+## Flash and short-speech physical test — 2026-11-15
+
+User ran `tools/muse/board.sh flash s3n` on the Mac. The output ended in `Hash of data verified.` followed by `Hard resetting via RTS pin...`, indicating a successful flash operation. The user explicitly confirmed **short voice test passes**.
+
+- [x] Full 16 MB previous firmware backup obtained privately (previous section)
+- [x] Flashing of feature firmware on ESP32-S3 **PASS**
+- [x] Short Fish Audio voice response **PASS (user-confirmed)**
+- [ ] Long (~500-word) response spoken fully to final sentence
+- [ ] Check no missing/reordered chunks and no unexpected resets
+- [ ] Check full reply forwarding and Pi multi-page e-paper navigation
+
+**Do not mark the full-length TTS feature complete until the user confirms long-response physical playback.**
