@@ -92,3 +92,14 @@ Replace the placeholder with the timestamp of the saved file. **Do not** delete 
 - [ ] Queue feedback and page numbers correct
 - [ ] No regressions in e-paper, HTTP bridge, Fish Audio or GPIO
 - [ ] Phase 5 service reboot and restart remain functional
+
+## Phase 6 pre-deployment Raspberry Pi tests — 2026-11-15
+
+User ran the no-hardware test suite on Raspberry Pi after switching to `feature/phase6-oled-status-2026-11`:
+
+- `python3 -m py_compile muse_pi.py`: **PASS** (no errors)
+- `test_oled_status.py`: **5 tests PASS**
+- `test_single_instance.py`: **2 tests PASS**
+- `test_pagination.py`: **3 tests PASS**
+
+**Status: software tests PASS; physical deployment and OLED/e-paper regression tests not yet performed.** Preserve the working Phase 5 live script before copying the Phase 6 code. The existing systemd unit is unchanged.
