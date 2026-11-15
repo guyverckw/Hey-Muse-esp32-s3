@@ -117,6 +117,7 @@ static const char *TAG = "muse_chat_session";
 #define FINAL_TIMEOUT_US (15 * 1000000LL)  /* release -> final transcript */
 #define REPLY_TIMEOUT_US (60 * 1000000LL)  /* chat posted -> first assistant message */
 #define TURN_CAP_US (180 * 1000000LL)
+#define LONG_SPEECH_CAP_US (12 * 60 * 1000000LL) /* long spoken replies need more than 3 min */
 #define SETTLE_US (3 * 1000000LL)          /* quiet period that ends a turn */
 #define BUSY_HOLD_US (20 * 1000000LL)      /* how long a busy agent keeps it open */
 #define TEXT_REPLY_TIMEOUT_US (5 * 60 * 1000000LL)   /* typed turns: agents can work a while */
@@ -1871,7 +1872,21 @@ static void check_turn(void)
         return;
     }
     bool text = s_turn.text;
-    if (t - s_turn.start_us > (text ? TEXT_TURN_CAP_US : TURN_CAP_US)) {
+    // A long Fish Audio sequence can legitimately take longer than the
+    // original three-minute voice cap. Extend the cap only while speech is
+    // queued/active or when speech completed after that deadline; retain the
+    // original cap for a stalled conversation with no speech.
+    bool speech_in_progress = false;
+    bool long_speech_completed = false;
+    for (int i = 0; i < s_turn.nmsgs; i++) {
+        if (s_turn.msgs[i].tts == TTS_ACTIVE || s_turn.msgs[i].tts == TTS_QUEUED)
+            speech_in_progress = true;
+        if (s_turn.msgs[i].tts == TTS_FINISHED && s_turn.msgs[i].pcm_frames)
+            long_speech_completed = true;
+    }
+    const int64_t cap = text ? TEXT_TURN_CAP_US :
+        (speech_in_progress || long_speech_completed ? LONG_SPEECH_CAP_US : TURN_CAP_US);
+    if (t - s_turn.start_us > cap) {
         ESP_LOGW(TAG, "turn hit the time cap");
         turn_done(false);
         return;
