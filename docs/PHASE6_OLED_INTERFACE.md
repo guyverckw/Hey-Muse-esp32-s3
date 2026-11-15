@@ -114,3 +114,15 @@ After the Phase 6 application deployment steps, the user reported: **"The OLED a
 - [ ] Confirm Phase 5 systemd service still starts correctly following reboot (optional final verification if service was not modified)
 
 **Status:** Phase 6 OLED animation increment physically validated; complete phase acceptance pending final end-to-end check. No changes were made to the ESP32 firmware, e-paper driver or systemd unit.
+
+## Final end-to-end hardware regression confirmation — 2026-11-15
+
+The user confirmed that **everything remains working** following deployment of the Phase 6 OLED animation changes, in direct response to checks for Fish Audio speech, AI replies on the e-paper, and LEFT/RIGHT page navigation.
+
+- [x] OLED LISTENING/THINKING/SPEAKING animations — **PASS**, user-observed on hardware
+- [x] Fish Audio speech after update — **PASS**, user-confirmed
+- [x] AI replies visible on e-paper — **PASS**, user-confirmed
+- [x] LEFT/RIGHT e-paper navigation — **PASS**, user-confirmed
+- [x] Phase 6 Python syntax plus 10 regression/unit tests — **PASS**
+
+**Phase 6 OLED animation and queue-feedback increment: COMPLETE (user-verified).** Further network-status enhancements and menu polish are potential subsequent Phase 6 work, not part of this increment's acceptance. Existing Phase 5 automatic-start service and prior backup branch remain unchanged.
