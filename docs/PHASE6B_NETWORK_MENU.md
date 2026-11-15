@@ -144,3 +144,14 @@ After recovering the working Phase 6a system, the user updated the Phase 6b sour
 - `grep` confirmed `now = time.monotonic()` on line 850 before `if now >= next_link_check:` on line 853.
 
 **15 tests PASS plus startup fix verified in checked-out source.** This is software validation only; corrected Phase 6b has not yet been redeployed or validated against hardware. Retain Phase 6a backup and inspect systemd restart count / application logs after the next controlled deployment.
+
+## Physical test follow-up — 2026-11-15: e-paper cooldown and long TTS
+
+The user reported that the OLED menu works following the corrected Phase 6b deployment. Two remaining issues were observed: e-paper pages did not refresh after an expected 30-second wait, and spoken output stopped partway through a long multi-page reply.
+
+Code inspection found **two independent known limits**:
+
+1. `raspberry-pi/systemd/hey-muse-pi.service` sets `MUSE_EPAPER_REFRESH_SECONDS=180` and the Pi program defaults to 180, with a minimum of 30. The 30-second mode is intended only for short supervised tests. E-paper updates also take hardware time after cooldown expires. The delayed pages are consistent with the current configured 180-second cooldown and not yet proven a new software regression.
+2. `esp32/components/muse/muse_chat_session.cpp` uses `TEXT_MAX=1024` for spoken caption/Fish Audio input, while `PI_REPLY_MAX_BYTES=8192` independently sends longer replies to the Pi. The `start_tts()` path still passes the 1 KB caption text to `muse_fish_tts_generate()`. This is a plausible deterministic cause of long e-paper answers exceeding spoken text. It is not caused by the Pi OLED network indicators. Longer TTS remains a separate ESP32 firmware enhancement; no untested changes have been deployed.
+
+**Phase 6b acceptance:** OLED menu reported working, but end-to-end long-reply speech and requested 30-second test mode remain to be addressed / confirmed. Keep the previous Phase 6a backup available. Before any TTS firmware changes, design bounded UTF-8-safe chunking, account for Fish Audio request costs, and verify end-of-audio handling on hardware.
