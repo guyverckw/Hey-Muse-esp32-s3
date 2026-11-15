@@ -90,3 +90,21 @@ The board name and flash invocation are those used previously on this user's ESP
 - [ ] Confirmed acceptable Fish Audio latency and API usage
 
 If long speeches fail even with chunked text, investigate Fish Audio's per-request behaviour, PCM queue backpressure, turn-lifetime and ESP32 serial logs before increasing buffer sizes or changing Pi code.
+
+## Mac build result — 2026-11-15 (user-reported)
+
+User compiled and ran the standalone C++ UTF-8 chunk test on the Mac:
+
+```
+PASS: lossless UTF-8 chunking, sizes, order and boundaries
+```
+
+The first firmware build command (`tools/muse/board.sh build s3n` from repository root) did not execute because the script is under `esp32/tools/muse/board.sh`. After `cd esp32`, the user ran `tools/muse/board.sh build s3n` and received the successful ESP-IDF build trailer containing the exact generated `esptool ... write-flash` command for `build-muse-waveshare-s3-175/muse-gadget.bin`. This indicates **BUILD PASSED**; the output is a build instruction, not evidence of flashing.
+
+- [x] Native C++ UTF-8 chunk test **PASS**
+- [x] ESP-IDF 6.0 build for s3n **PASS**, based on user's final build output
+- [ ] Full flash backup / tested firmware recovery artifact securely saved locally
+- [ ] Flash new build on ESP32
+- [ ] Test short speech, audible complete multi-page speech and cancellation
+
+**Do not commit a flash dump to GitHub:** it can contain tokens, passwords and paired-device secrets.
