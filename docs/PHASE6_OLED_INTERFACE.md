@@ -103,3 +103,14 @@ User ran the no-hardware test suite on Raspberry Pi after switching to `feature/
 - `test_pagination.py`: **3 tests PASS**
 
 **Status: software tests PASS; physical deployment and OLED/e-paper regression tests not yet performed.** Preserve the working Phase 5 live script before copying the Phase 6 code. The existing systemd unit is unchanged.
+
+## Physical OLED animation test — 2026-11-15
+
+After the Phase 6 application deployment steps, the user reported: **"The OLED animations are working as expected."**
+
+- [x] Pi software validation: five OLED-status, two singleton, three pagination tests passed
+- [x] OLED animated status interface works on the actual display (user-reported): **PASS**
+- [ ] Final end-to-end regression: verify a fresh ESP32-sourced reply, normal Fish Audio speech, e-paper display and physical LEFT/RIGHT navigation
+- [ ] Confirm Phase 5 systemd service still starts correctly following reboot (optional final verification if service was not modified)
+
+**Status:** Phase 6 OLED animation increment physically validated; complete phase acceptance pending final end-to-end check. No changes were made to the ESP32 firmware, e-paper driver or systemd unit.
