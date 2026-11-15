@@ -89,6 +89,30 @@ def oled_footer(status: str, new_reply: bool, queued: bool,
     return "NEW REPLY - KEY2" if new_reply else "MUSE: READY"
 
 
+def pi_link_state(sysfs: Path = Path("/sys/class/net")) -> str:
+    """Local interface link only: W=Wi-Fi, E=Ethernet, -=no active link.
+
+    Not an Internet reachability check; no network requests or passwords.
+    """
+    for name, indicator in (("wlan0", "W"), ("eth0", "E")):
+        try:
+            if (sysfs / name / "operstate").read_text(encoding="ascii").strip() == "up":
+                return indicator
+        except OSError:
+            pass
+    return "-"
+
+
+def esp32_seen_recently(last_seen: float | None, now: float, window: float = 90.0) -> bool:
+    """Only a recent authenticated bridge request, not a device connection probe."""
+    return last_seen is not None and 0 <= now - last_seen < window
+
+
+def menu_line(index: int, entries: list[str]) -> str:
+    """Reserve rightmost three OLED characters for selection position."""
+    return f"> {entries[index][:13]:13} {index + 1}/{len(entries)}"
+
+
 def project_dir() -> Path:
     return Path.home() / "hey-muse-display"
 
@@ -142,7 +166,7 @@ def create_token_if_needed() -> str:
     return path.read_text(encoding="utf-8").strip()
 
 
-def status_info() -> str:
+def status_info(link: str = "-", esp_recent: bool = False, esp_ever: bool = False) -> str:
     try:
         disk = shutil.disk_usage("/")
         thermal = Path("/sys/class/thermal/thermal_zone0/temp")
@@ -156,6 +180,8 @@ def status_info() -> str:
             power = "unknown"
         return (
             f"Host: {socket.gethostname()}\n"
+            f"Pi link: { {'W':'Wi-Fi link','E':'Ethernet link'}.get(link, 'no link detected') }\n"
+            f"ESP32 signal: {'recent' if esp_recent else 'stale' if esp_ever else 'not yet seen'}\n"
             f"Temperature: {temp}\n"
             f"Free storage: {disk.free / (1024**3):.1f} GB\n"
             f"Power: {power}\n"
@@ -456,6 +482,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.server.status_queue.put_nowait(state)
                 except queue.Full:
                     pass
+            self.server.last_esp32_at = time.monotonic()
             self.respond(202, {"accepted": True})
             return
 
@@ -473,6 +500,8 @@ class Handler(BaseHTTPRequestHandler):
         except queue.Full:
             self.respond(503, {"error": "inbox_full"})
             return
+        if source == "esp32":
+            self.server.last_esp32_at = time.monotonic()
         self.respond(202, {"accepted": True})
 
 
@@ -485,6 +514,8 @@ class BridgeServer(ThreadingHTTPServer):
         self.token = token
         self.inbox = inbox
         self.status_queue = queue.Queue(maxsize=32)
+        # Updated only by valid authenticated ESP32 status or reply messages.
+        self.last_esp32_at = None
 
 
 def start_server(bind: str, port: int, inbox: Inbox):
@@ -554,6 +585,8 @@ def run_app(inbox: Inbox, bind: str, port: int):
     new_reply = False
     live_status = "idle"
     live_status_at = time.monotonic()
+    pi_link = pi_link_state()
+    next_link_check = time.monotonic() + 5.0
     # Expire stale transient statuses if Wi-Fi drops or ESP32 reboots.
     LIVE_STATUS_TIMEOUT = 90.0
     # AUTO_EPAPER_REFRESH_PATCH_V1: pending latest reply, handled in the main loop.
@@ -568,7 +601,8 @@ def run_app(inbox: Inbox, bind: str, port: int):
 
     def current():
         if view == "status":
-            return status_info(), "PI STATUS", "RASPBERRY PI"
+            return status_info(pi_link, esp32_seen_recently(server.last_esp32_at,
+                               time.monotonic()), server.last_esp32_at is not None), "PI STATUS", "RASPBERRY PI"
         if view == "reply":
             if not inbox.messages:
                 return "No AI replies received yet.", "AI RESPONSE", "INBOX EMPTY"
@@ -584,7 +618,10 @@ def run_app(inbox: Inbox, bind: str, port: int):
         # E-paper worker never draws the OLED. Main loop owns every screen update.
         with canvas(oled) as draw:
             draw.rectangle((0, 0, 127, 63), outline="white")
-            draw.text((16, 2), "HEY MUSE", fill="white")
+            draw.text((10, 2), "HEY MUSE", fill="white")
+            # W/E means a local interface has link; it does not prove Internet
+            # access or that the ESP32 is reachable.
+            draw.text((89, 2), pi_link, fill="white")
             # Status animation is confined to the title line (right edge).
             bars = oled_animation_frame(live_status, now)
             if live_status == "thinking":
@@ -600,7 +637,7 @@ def run_app(inbox: Inbox, bind: str, port: int):
             else:
                 draw.ellipse((113, 5, 118, 10), outline="white", fill="white")
             draw.line((4, 16, 123, 16), fill="white")
-            draw.text((4, 19), ("> " + MENU[selected])[:20], fill="white")
+            draw.text((4, 19), menu_line(selected, MENU), fill="white")
             text, heading, _ = current()
             pages = paginate(text, heading=heading)
             subtitle = (f"Reply {len(inbox.messages)} | {page + 1}/{len(pages)}"
@@ -801,6 +838,14 @@ def run_app(inbox: Inbox, bind: str, port: int):
                     # refresh() persists its cooldown before accessing e-paper.
                     # Keep pending to retry after the cooldown; do not kill the UI.
                     print(f"Automatic e-paper refresh failed: {exc!r}", flush=True)
+            # Read local kernel network link state at low frequency; no DNS,
+            # ping, remote HTTP, or blocking network operations on the UI.
+            if now >= next_link_check:
+                next_link_check = now + 5.0
+                updated_link = pi_link_state()
+                if updated_link != pi_link:
+                    pi_link = updated_link
+                    draw_oled()
             # Update animated states twice per second; queued countdown at the
             # same pace. No e-paper operations are initiated by OLED animation.
             now = time.monotonic()
