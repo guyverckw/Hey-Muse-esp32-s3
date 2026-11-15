@@ -121,3 +121,13 @@ The user reported the OLED showing the menu for about 1 second, going blank for 
 **Development fix:** commit `dbc5ae2` moves monotonic clock assignment above the network check. Follow-on commit `f979f15` adds a focused AST regression test ensuring the main UI loop initialises `now` before evaluating network timers.
 
 **Status: deployment FAILED on initial Phase 6b version. Code fix prepared in branch; NOT YET VERIFIED on Raspberry Pi.** After recovery, obtain the last 40 journal entries if the service still restarts. Do not replace the running, recovered Phase 6a code until the updated tests pass and the user is ready to retry a controlled deployment.
+
+## Recovery confirmation — 2026-11-15
+
+The user restored the live application from the pre-Phase-6b Phase 6a backup and confirmed: **"After restored to Phase 6a, it works again."**
+
+- [x] Phase 6a recovery after Phase 6b startup failure: **PASS (user-observed)**
+- [ ] Corrected Phase 6b code and new regression test run on Raspberry Pi
+- [ ] Controlled Phase 6b redeployment and physical acceptance
+
+**Live system is back on the user-tested Phase 6a version. Do not overwrite it until the corrected development branch passes Pi tests.**
