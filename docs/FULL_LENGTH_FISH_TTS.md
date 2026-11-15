@@ -50,10 +50,13 @@ With the usual Muse ESP-IDF development environment configured:
 ```bash
 cd ~/Documents/ESP32/MUSE/Hey-Muse-esp32-s3
 . ~/esp/esp-idf-v6/export.sh
+cd esp32
 tools/muse/board.sh build s3n
 ```
 
 Use the actual ESP-IDF export path if it differs on the Mac. The build must pass without warnings/errors from the new code before flashing. Keep the previously working binary and local settings backed up.
+
+**Build script location:** `esp32/tools/muse/board.sh`. From the repository root, `tools/muse/board.sh` does not exist. The script writes its build log to `/tmp/muse_build_s3n.log`.
 
 ## Step 3 — Physical regression after successful build (do not flash prematurely)
 
