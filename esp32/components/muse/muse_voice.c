@@ -407,6 +407,11 @@ static bool hatch_reply(bool *delivered)
     bool done = false, speaking = false, replied = false;
     size_t played = 0;
     int64_t t0 = esp_timer_get_time();
+    // The Pi expires a transient OLED status after 90 seconds. Long Fish
+    // Audio replies may last much longer, so periodically reassert SPEAKING.
+    // Keep this separate from audio generation and avoid blocking on network.
+    const int64_t speaking_heartbeat_us = 20 * 1000000LL;
+    int64_t next_speaking_heartbeat_us = 0;
     *delivered = false;
     for (;;) {
         muse_hatch_ev_t ev;
@@ -455,6 +460,7 @@ static bool hatch_reply(bool *delivered)
                 speaking = true;
                 muse_state_set_mode(MUSE_MODE_SPEAKING);
                 muse_pi_bridge_enqueue_status("speaking"); /* MUSE_PI_LIVE_STATUS_V1 */
+                next_speaking_heartbeat_us = esp_timer_get_time() + speaking_heartbeat_us;
                 ESP_LOGI(TAG, "reply audio after %.2fs", (esp_timer_get_time() - t0) / 1e6);
             }
             muse_state_set_level(muse_audio_level(buf, n));
@@ -466,6 +472,12 @@ static bool hatch_reply(bool *delivered)
             /* Between messages: keep the speaker fed so it doesn't replay stale DMA. */
             muse_state_set_level(0);
             muse_audio_write(silence, MUSE_AUDIO_CHUNK);
+        }
+        // A heartbeat is safe even during a gap between TTS chunks: the
+        // playback loop is still active, and only its exit sends IDLE.
+        if (speaking && esp_timer_get_time() >= next_speaking_heartbeat_us) {
+            muse_pi_bridge_enqueue_status("speaking");
+            next_speaking_heartbeat_us = esp_timer_get_time() + speaking_heartbeat_us;
         }
         /* The page being said, or before the speech the reply's opening page. */
         if ((speaking || replied) && muse_hatch_turn_caption(played, page, sizeof(page))) {
