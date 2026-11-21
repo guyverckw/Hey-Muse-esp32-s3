@@ -31,6 +31,7 @@
 
 #include "muse_adpcm.h"
 #include "muse_audio.h"
+#include "muse_tts_wake_observer.h"
 #include "muse_board.h"
 #include "muse_chat.h"
 #include "muse_input.h"
@@ -437,6 +438,7 @@ static bool hatch_reply(bool *delivered)
             case MUSE_HATCH_EV_ERROR:
                 ESP_LOGW(TAG, "muse: %s", text);
                 muse_state_set_level(0);
+                muse_tts_wake_observer_stop();
                 go_idle(text);
                 return false;
             default:
@@ -445,6 +447,7 @@ static bool hatch_reply(bool *delivered)
         }
         if (got_event(MUSE_PTT_DOWN)) {
             ESP_LOGI(TAG, "reply interrupted");
+            muse_tts_wake_observer_stop();
             muse_hatch_turn_cancel();
             muse_state_set_level(0);
             return true;
@@ -453,6 +456,7 @@ static bool hatch_reply(bool *delivered)
         if (n) {
             if (!speaking) {
                 speaking = true;
+                muse_tts_wake_observer_start();
                 muse_state_set_mode(MUSE_MODE_SPEAKING);
                 muse_pi_bridge_enqueue_status("speaking"); /* MUSE_PI_LIVE_STATUS_V1 */
                 ESP_LOGI(TAG, "reply audio after %.2fs", (esp_timer_get_time() - t0) / 1e6);
@@ -472,6 +476,7 @@ static bool hatch_reply(bool *delivered)
             muse_state_set_caption("%s", page);
         }
     }
+    muse_tts_wake_observer_stop();
     muse_state_set_level(0);
     ESP_LOGI(TAG, "muse reply: %.2fs of audio, %.2fs total", (double)played / MUSE_AUDIO_RATE,
              (esp_timer_get_time() - t0) / 1e6);
