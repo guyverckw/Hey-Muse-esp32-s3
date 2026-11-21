@@ -93,3 +93,23 @@ Use the existing board targets, e.g. `s3`, `box3`, `watcher`, etc.; see `tools/m
 - The optional Pi bridge currently uses a manually supplied local header and fixed endpoint; future work could move that into secure on-device settings, but **not required** for this modular build.
 - Separate build folders prevent Pi-enabled/standalone SDKCONFIG and flash arguments from overwriting each other.
 - The original stable source and both user-created backup copies remain intact.
+
+## Mac build verification — 2026-11-21
+
+User ran both firmware builds on Intel macOS with ESP-IDF 6.0 and reported successful script completion. The provided command outputs ended in ESP-IDF/esptool flash instructions, not build errors:
+
+- **Standalone:** `tools/muse/board.sh build s3n` — **PASS**, produced `build-muse-waveshare-s3-175/muse-gadget.bin`.
+- **Pi companion:** `MUSE_PI_BRIDGE=1 tools/muse/board.sh build s3n` — **PASS**, produced `build-muse-waveshare-s3-175-pi/muse-gadget.bin`.
+
+These were build-only commands. **No flash or on-device test was reported.** The user did not yet provide Python regression-test output, explicit build-time Kconfig settings, linker maps or firmware sizes, so those are **pending verification**.
+
+For the next check, run from `esp32/`:
+
+```bash
+printf 'Standalone config: '; grep -E '^CONFIG_MUSE_PI_BRIDGE=|^# CONFIG_MUSE_PI_BRIDGE is not set' build-muse-waveshare-s3-175/sdkconfig
+printf 'Pi-enabled config: '; grep -E '^CONFIG_MUSE_PI_BRIDGE=|^# CONFIG_MUSE_PI_BRIDGE is not set' build-muse-waveshare-s3-175-pi/sdkconfig
+ls -lh build-muse-waveshare-s3-175/muse-gadget.bin build-muse-waveshare-s3-175-pi/muse-gadget.bin
+find build-muse-waveshare-s3-175 build-muse-waveshare-s3-175-pi -maxdepth 1 -name '*.map' -print
+```
+
+Inspect the linker map or `compile_commands.json` for `muse_pi_bridge.cpp` to establish actual omission in standalone output. Do not treat two successful builds alone as measured proof of binary omission. Keep the user-tested stable baseline and current live ESP32 firmware unchanged.
