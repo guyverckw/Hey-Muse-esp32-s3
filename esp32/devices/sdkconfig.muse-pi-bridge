@@ -1,0 +1,4 @@
+# Optional companion profile: append after the selected board defaults.
+# Use MUSE_PI_BRIDGE=1 tools/muse/board.sh build s3n to select this build.
+# No credentials are stored in this file.
+CONFIG_MUSE_PI_BRIDGE=y

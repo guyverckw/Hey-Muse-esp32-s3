@@ -24,3 +24,6 @@ muse-simulator.ppm
 # Local gadget provisioning and original-device flash backups.
 .sdk-token
 /backups/
+
+# Private Raspberry Pi bridge configuration for optional ESP32 companion mode.
+/esp32/components/muse/muse_pi_bridge_config.h

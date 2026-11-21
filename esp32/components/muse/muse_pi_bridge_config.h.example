@@ -1,0 +1,6 @@
+#pragma once
+/* Example only. Copy to muse_pi_bridge_config.h when enabling the Pi bridge.
+ * Never commit the real URL/token or a full-flash firmware image to GitHub.
+ * The endpoint must be the Raspberry Pi's authenticated reply endpoint. */
+#define MUSE_PI_BRIDGE_URL "http://YOUR_PI_HOST_OR_IP:8765/api/v1/reply"
+#define MUSE_PI_BRIDGE_TOKEN "REPLACE_WITH_PRIVATE_PI_BRIDGE_BEARER_TOKEN"
