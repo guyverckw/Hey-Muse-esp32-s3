@@ -162,3 +162,23 @@ idf.py -B build-muse-waveshare-s3-175-pi size
 ```
 
 This compares linked section usage without flashing hardware. Keep this PR in draft until hardware tests pass.
+
+## Actual linked memory comparison — 2026-11-21 (user-provided `idf.py size` logs)
+
+User executed `idf.py -B build-muse-waveshare-s3-175 size` and `idf.py -B build-muse-waveshare-s3-175-pi size` on macOS. Both completed with memory summaries:
+
+| Reported category | Standalone (bytes) | Pi companion (bytes) | Pi minus standalone |
+| --- | ---: | ---: | ---: |
+| Flash Data | 1,803,672 | 1,804,264 | +592 |
+| Flash Code | 1,693,612 | 1,694,924 | +1,312 |
+| DIRAM total used | 170,421 | 170,421 | 0 |
+| External RAM static used | 33,008 | 33,008 | 0 |
+| RTC SLOW used | 2,096 | 2,096 | 0 |
+| RTC FAST used | 72 | 72 | 0 |
+| **Reported total image size** | **3,629,525** | **3,631,429** | **+1,904** |
+
+Conclusion: standalone mode excludes the Pi bridge source from compilation and reduces the **linked image** by **1,904 bytes** (roughly 1.9 KB). Earlier reported padded `.bin` files remain equal at 3,674,112 bytes, and both ELF files round to 29 MB on `ls -lh`. The equal static RAM figures do **not** imply equal runtime heap usage: the Pi HTTP worker, queue and allocations are created when used.
+
+The standalone `size` action re-ran CMake and dependency processing, producing multiple version/compatibility, unknown Kconfig-symbol and deprecated-CMake warnings, and printed a `Missing kconfig option. Re-run the build process...` warning. Despite that, the provided log reached a successful memory-size summary for both configurations; no fatal compilation error was visible in the provided excerpt. Warnings should be tracked separately if they recur in clean builds; do not conflate them with a modularization failure.
+
+**Verification status:** profile flags, separate source compilation, differing firmware hashes, and linked memory comparison all passed. **Physical flashing and standalone/companion device acceptance are still pending.** Leave existing user-tested hardware and `stable/hey-muse-2026-11-21-wake-tested` unchanged until the user chooses hardware tests.
