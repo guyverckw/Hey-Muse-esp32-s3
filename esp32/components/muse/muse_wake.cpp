@@ -41,7 +41,10 @@ constexpr size_t TENSOR_ARENA_SIZE = 64 * 1024;
 constexpr size_t VARIABLE_ARENA_SIZE = 1024;
 constexpr size_t PROBABILITY_WINDOW = 6;
 constexpr size_t WARMUP_WINDOWS = 20;
-constexpr uint8_t PROBABILITY_CUTOFF = static_cast<uint8_t>(0.99f * 255.0f);
+/* Phase 7: the original 99% six-window rolling average routinely missed
+ * first-attempt wake phrases. Start at 90% without relaxing the six-window
+ * smoothing; verify false positives on the actual board before further tuning. */
+constexpr uint8_t PROBABILITY_CUTOFF = static_cast<uint8_t>(0.90f * 255.0f);
 
 struct FrontendState s_frontend{};
 bool s_frontend_ready;
