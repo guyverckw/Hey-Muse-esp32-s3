@@ -45,8 +45,14 @@ if(CONFIG_MUSE_ENABLED)
         "muse_link.c"
         "muse_ble.c")
     if(CONFIG_MUSE_HATCH)
-        list(APPEND srcs "muse_chat.c" "muse_account_api.c" "muse_chat_session.cpp" "muse_pi_bridge.cpp"
+        list(APPEND srcs "muse_chat.c" "muse_account_api.c" "muse_chat_session.cpp"
              "muse_fish_tts.c")
+        if(CONFIG_MUSE_PI_BRIDGE)
+            if(NOT EXISTS "${COMPONENT_DIR}/muse_pi_bridge_config.h")
+                message(FATAL_ERROR "Pi bridge enabled: create components/muse/muse_pi_bridge_config.h from muse_pi_bridge_config.h.example")
+            endif()
+            list(APPEND srcs "muse_pi_bridge.cpp")
+        endif()
         list(APPEND embed "test_reply.mp3")   # muse_hatch_mp3_selftest
     else()
         list(APPEND srcs "muse_chat_link.c")   # text replies over Link's session
@@ -105,7 +111,10 @@ if(CONFIG_MUSE_ENABLED)
 elseif(CONFIG_HOMEHUB_VOICE)
     # The Voice PE board uses just the Hatch voice session; the project's main/
     # voice_muse_chat.c stands in for the Muse settings, Wi-Fi and Link hooks.
-    list(APPEND srcs "muse_chat.c" "muse_account_api.c" "muse_chat_session.cpp" "muse_pi_bridge.cpp" "muse_chat_text.c" "muse_text.c")
+    list(APPEND srcs "muse_chat.c" "muse_account_api.c" "muse_chat_session.cpp" "muse_chat_text.c" "muse_text.c")
+    if(CONFIG_MUSE_PI_BRIDGE)
+        list(APPEND srcs "muse_pi_bridge.cpp")
+    endif()
     list(APPEND embed "test_reply.mp3")
 endif()
 
