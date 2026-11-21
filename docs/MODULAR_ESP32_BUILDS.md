@@ -140,3 +140,25 @@ PY
 ```
 
 Future hardware verification should run both builds on appropriate test devices and preserve the existing accepted production baseline.
+
+## Artifact hash comparison — 2026-11-21 (user-reported)
+
+The user compared the two Mac-generated firmware image hashes and the ELF file sizes:
+
+| Output | Standalone ESP32 | Raspberry Pi companion |
+| --- | --- | --- |
+| `muse-gadget.bin` SHA-256 | `b1802c7f5c4b91cc9bf605f99f306519c4a9c19a1e82358b62b4438f04ad517a` | `84be38cf1a080c6a591ac2e69ec59e6ab322edc5b34a012e30d0c52002909f4e` |
+| `muse-gadget.bin` length | 3,674,112 bytes | 3,674,112 bytes |
+| `muse-gadget.elf` size (rounded by `ls -lh`) | 29 MB | 29 MB |
+
+**Verification:** SHA-256 hashes differ, so the two generated binary files have different contents. The compilation database previously showed that `muse_pi_bridge.cpp` is not compiled in standalone and is compiled in companion mode. Identical image lengths and rounded ELF sizes do not establish equal linked section sizes or prove any specific flash/RAM savings. Both modes still require physical acceptance testing.
+
+Next optional comparison on the Mac with ESP-IDF toolchain exported:
+
+```bash
+cd ~/Documents/ESP32/MUSE/Hey-Muse-esp32-s3/esp32
+idf.py -B build-muse-waveshare-s3-175 size
+idf.py -B build-muse-waveshare-s3-175-pi size
+```
+
+This compares linked section usage without flashing hardware. Keep this PR in draft until hardware tests pass.
