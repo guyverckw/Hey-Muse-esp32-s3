@@ -1,6 +1,6 @@
 # Phase 7a — Increase Hey Muse wake-word sensitivity
 
-**Status:** prepared in GitHub, **not built, flashed, or hardware-accepted yet**.
+**Status:** user-accepted on the physical ESP32; improved first-attempt wake detection reported on 2026-11-21.
 
 ## User-reported issue
 Existing offline "Hey Muse" wake detection works, but usually fails on the first spoken attempt, requiring multiple repetitions. User explicitly wants to improve **existing** wake recognition before other voice-interaction work. Do not reimplement wake-word support or duplicate Muse cloud memory features.
@@ -44,9 +44,21 @@ Keep same placement, mic gain, Wi-Fi, distance and room conditions. Record resul
 4. Verify wake while screen is asleep and no unexpected microphone clipping or missed responses.
 5. Confirm after waking: LISTENING → THINKING → SPEAKING → READY; long Fish Audio reply, Pi e-paper and 30s cooldown unchanged.
 
-**Trade-off:** a less strict cutoff increases sensitivity but can also increase false positives. If false activations increase unacceptably, restore the stable branch / firmware backup, or retune with data. This test is pending; don't claim 90% is ideal before measuring.
+**Trade-off:** a less strict cutoff increases sensitivity but can also increase false positives. If false activations increase unacceptably, restore the stable branch / firmware backup, or retune with data. User reports a substantial improvement and accepts this setting. A numerical detection rate and formal false-trigger test have not been supplied.
 
 ## Notes
 - The Pi is unaffected by this change.
 - Never upload a private flash dump or tokens to GitHub.
 - Keep this branch and PR separate from the accepted stable baseline.
+
+## Hardware acceptance update — 2026-11-21
+
+**User-confirmed improvement.** Following the Phase 7a 99% → 90% wake confidence threshold adjustment, the user reported: **"Now the success rate improved a lot, I am happy with that."** The user explicitly requested that the new code be saved as the working version in GitHub.
+
+- [x] Wake detection on the physical ESP32: markedly improved, user satisfied
+- [x] Source committed in GitHub; original code remains available in the prior stable baseline
+- [ ] Quantitative 10-trial first-attempt detection rate: not supplied
+- [ ] Formal false-positive background audio test: not separately reported
+- [ ] Separate retest of all other subsystems after this change: not separately reported
+
+**Decision:** Accept the sensitivity adjustment based on user feedback and preserve it as a **new stable source snapshot** while keeping the previous stable branch unchanged. Do not claim the unreported tests passed. No new changes to Fish Audio, OLED, Pi e-paper or the microphone gain.
