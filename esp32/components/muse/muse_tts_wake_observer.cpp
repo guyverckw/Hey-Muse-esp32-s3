@@ -65,6 +65,7 @@ void monitor_task(void *)
 
     ESP_LOGI(TAG, "AEC observer active: frame=%d samples, no TTS cancellation", frames);
     int offset = 0;
+    bool complete_reference = true;
     while (s_running) {
         int16_t mic[kAudioFrames];
         if (muse_audio_read(mic, kAudioFrames) != ESP_OK) {
@@ -76,9 +77,11 @@ void monitor_task(void *)
         // mean unaligned reference; physical test results are then inconclusive.
         bool has_ref = xQueueReceive(s_refs, &ref, 0) == pdTRUE;
         size_t n = has_ref ? ref.frames : 0;
-        if (!has_ref) {
-            // Count missed references separately from queue overflows.
+        if (!has_ref || n != kAudioFrames) {
+            // Never accept a detection from a frame lacking a full speaker
+            // reference: it could be our own unfiltered speaker output.
             ++s_overflows;
+            complete_reference = false;
         }
         for (size_t i = 0; i < kAudioFrames; ++i) {
             s_mic[offset] = mic[i];
@@ -86,12 +89,13 @@ void monitor_task(void *)
             ++offset;
             if (offset == frames) {
                 aec_process(aec, s_mic, s_ref, s_clean);
-                if (muse_wake_process(s_clean, frames)) {
+                if (complete_reference && muse_wake_process(s_clean, frames)) {
                     s_detected_until_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000) + kLabelMs;
                     ESP_LOGW(TAG, "DETECTED on AEC output; verify external speech, not speaker echo");
                     muse_wake_reset(); // require another complete wake phrase
                 }
                 offset = 0;
+                complete_reference = true;
             }
         }
     }
@@ -134,8 +138,8 @@ extern "C" void muse_tts_wake_observer_reference(const int16_t *pcm, size_t fram
         // Keep the newest reference. Never block the audio playback writer.
         RefChunk stale;
         xQueueReceive(s_refs, &stale, 0);
-        if (xQueueSend(s_refs, &chunk, 0) != pdTRUE) ++s_overflows;
-        else ++s_overflows;
+        xQueueSend(s_refs, &chunk, 0);
+        ++s_overflows;
     }
 }
 
@@ -148,7 +152,6 @@ extern "C" bool muse_tts_wake_observer_detected(void)
 
 extern "C" void muse_tts_wake_observer_stop(void)
 {
-    if (!s_running && !s_worker_alive) return;
     s_running = false;
     for (unsigned i = 0; i < 120 && s_worker_alive; ++i) {
         vTaskDelay(pdMS_TO_TICKS(10));
