@@ -113,3 +113,30 @@ find build-muse-waveshare-s3-175 build-muse-waveshare-s3-175-pi -maxdepth 1 -nam
 ```
 
 Inspect the linker map or `compile_commands.json` for `muse_pi_bridge.cpp` to establish actual omission in standalone output. Do not treat two successful builds alone as measured proof of binary omission. Keep the user-tested stable baseline and current live ESP32 firmware unchanged.
+
+## Build profile and compilation verification — 2026-11-21 (user-reported)
+
+On the Mac, after both S3N ESP-IDF builds succeeded, the user inspected the generated `sdkconfig`, `compile_commands.json`, and `muse-gadget.bin`:
+
+| Test | Standalone | Raspberry Pi companion |
+| --- | --- | --- |
+| Kconfig value | `# CONFIG_MUSE_PI_BRIDGE is not set` | `CONFIG_MUSE_PI_BRIDGE=y` |
+| `muse_pi_bridge.cpp` in compilation database | **NO** | **YES** |
+| `muse-gadget.bin` size | **3,674,112 bytes** | **3,674,112 bytes** |
+
+**Result: PASS for profile selection and compilation isolation.** Both images exist and both ESP-IDF builds previously completed successfully. An identical image length does **not** prove equal contents, equal linked code size, or absence of savings. ESP-IDF image alignment or other differences may explain it. Binary/ELF hashes, linker-map comparison, and physical hardware testing are still pending; **no devices have been flashed with these modular images**.
+
+For optional additional comparison from `esp32/`:
+
+```bash
+shasum -a 256 build-muse-waveshare-s3-175/muse-gadget.bin build-muse-waveshare-s3-175-pi/muse-gadget.bin
+python3 - <<'PY'
+from pathlib import Path
+for d in ('build-muse-waveshare-s3-175', 'build-muse-waveshare-s3-175-pi'):
+    p = Path(d)
+    elf = p / 'muse-gadget.elf'
+    print(d, 'ELF bytes:', elf.stat().st_size, 'map:', (p / 'muse-gadget.map').exists())
+PY
+```
+
+Future hardware verification should run both builds on appropriate test devices and preserve the existing accepted production baseline.
