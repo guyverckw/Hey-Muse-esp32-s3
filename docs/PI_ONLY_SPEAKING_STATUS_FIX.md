@@ -73,3 +73,9 @@ User fetched branch `feature/pi-speaking-status-lifetime-2026-11`, successfully 
 - `test_pagination.py` — **3/3 PASS**
 
 **Total: 18/18 PASS.** This establishes static/software test success, **not** physical OLED acceptance. Live Pi deployment and a long spoken-response test remain pending. No ESP32 firmware changes are required.
+
+## Physical test regression — 2026-11-21
+
+User reported after proceeding with the Pi-only fix: **"The OLED doesn't work, it didn't change states, just keep showing READY and the icons didn't change at all."** This is not the initial bug (SPEAKING reverting to READY after 90 seconds), because no transient status is displayed at all. The source diff is limited to per-state timeout logic, so the causal explanation is **unconfirmed**. Possible causes include ESP32-to-Pi status messages not reaching the bridge, wrong live file/version, or Pi queue/render path not processing status. Do not mark fix complete.
+
+**Next diagnostics:** check systemd service health/restarts, authenticated `POST /api/v1/status` HTTP response codes from the Pi journal during an ESP32 interaction, and which `muse_pi.py` is actually running. Collect journal entries before rollback. Restore latest known-good `muse_pi.before_speaking_fix_*.py` backup if live functionality is impaired, without modifying ESP32 firmware or the 30-second systemd cooldown drop-in.
