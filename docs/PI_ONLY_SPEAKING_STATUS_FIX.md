@@ -85,3 +85,13 @@ User reported after proceeding with the Pi-only fix: **"The OLED doesn't work, i
 User's live Raspberry Pi check returned `active`, `MainPID=29191`, `NRestarts=0`, `Environment=PYTHONUNBUFFERED=1 MUSE_EPAPER_REFRESH_SECONDS=30`, and HTTP `/health` JSON `{"status":"ok","service":"hey-muse-pi-bridge"}`. Supplied `journalctl --since '5 minutes ago'` contained **only two local loopback GET /health 200** entries; no POST `/api/v1/status` appeared **in that limited window**. Whether a voice interaction happened during the same window was not established, so status-delivery failure remains unconfirmed.
 
 Next targeted checks: `journalctl -f` while asking Hey Muse a short question to observe POST `/api/v1/status` responses or failures; inspect live `~/hey-muse-display/muse_pi.py` for both `LIVE_STATUS_TIMEOUT` and `SPEAKING_STATUS_TIMEOUT`. Do not change ESP32 firmware or assume a Pi timeout bug caused the missing statuses. Retain 30-second systemd override and backup.
+
+## Network mismatch identified and corrected — 2026-11-21
+
+User discovered that the ESP32 Hey Muse was connected to a **different Wi-Fi network** from the Raspberry Pi. They changed the ESP32 network and report that the OLED status display is working again and **seems to be working fine**.
+
+This explains why previous Pi journal logs contained local `/health` requests but no ESP32 `/api/v1/status` posts in the sampled period. The earlier READY-only symptom was a **network connectivity/configuration issue**, not evidence that the new Pi-only timeout code had broken status rendering.
+
+**Current user-observed status:** OLED appears restored after moving Hey Muse onto the proper network. Full acceptance of the Pi-only 15-minute SPEAKING fallback is still pending a specifically timed long voice response (>90 seconds) that stays in SPEAKING until playback is complete. Existing full-length TTS and the Pi's 30-second cooldown are unchanged.
+
+**No further code changes required for the network mismatch.** Do not flash the alternative ESP32 status-heartbeat branch unless a separate issue arises.
