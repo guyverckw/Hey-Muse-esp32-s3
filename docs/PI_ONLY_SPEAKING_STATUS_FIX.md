@@ -60,3 +60,16 @@ Expected environment still includes `MUSE_EPAPER_REFRESH_SECONDS=30` if the prev
 - [ ] If ESP32 disconnects during SPEAKING, no premature READY; 15-minute stale fallback (may simulate by manipulating status in a standalone test rather than waiting on real hardware).
 
 For rollback, stop service, restore the newest `muse_pi.before_speaking_fix_*.py` to `muse_pi.py`, and start service. The separate ESP32 heartbeat PR #5 is an alternative but **not required** for this Pi-only solution; don't flash it.
+
+## Raspberry Pi development checkout validation — 2026-11-21
+
+User fetched branch `feature/pi-speaking-status-lifetime-2026-11`, successfully switched to tracking its origin, and executed the Pi tests:
+
+- `python3 -m py_compile muse_pi.py` — **PASS** (no errors)
+- `test_speaking_timeout.py` — **3/3 PASS**
+- `test_network_menu.py` — **5/5 PASS**
+- `test_oled_status.py` — **5/5 PASS**
+- `test_single_instance.py` — **2/2 PASS**
+- `test_pagination.py` — **3/3 PASS**
+
+**Total: 18/18 PASS.** This establishes static/software test success, **not** physical OLED acceptance. Live Pi deployment and a long spoken-response test remain pending. No ESP32 firmware changes are required.
