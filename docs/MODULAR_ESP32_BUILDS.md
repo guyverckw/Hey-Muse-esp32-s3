@@ -182,3 +182,18 @@ Conclusion: standalone mode excludes the Pi bridge source from compilation and r
 The standalone `size` action re-ran CMake and dependency processing, producing multiple version/compatibility, unknown Kconfig-symbol and deprecated-CMake warnings, and printed a `Missing kconfig option. Re-run the build process...` warning. Despite that, the provided log reached a successful memory-size summary for both configurations; no fatal compilation error was visible in the provided excerpt. Warnings should be tracked separately if they recur in clean builds; do not conflate them with a modularization failure.
 
 **Verification status:** profile flags, separate source compilation, differing firmware hashes, and linked memory comparison all passed. **Physical flashing and standalone/companion device acceptance are still pending.** Leave existing user-tested hardware and `stable/hey-muse-2026-11-21-wake-tested` unchanged until the user chooses hardware tests.
+
+## Hardware testing decision — 2026-11-21
+
+The user does **not** have a spare ESP32 identical to the working Hey Muse board and explicitly elected to **skip flashing and hardware testing** of the modular profiles, to avoid risking the current stable device.
+
+**Final scope/status for this change: desktop build-verified, not hardware-validated.**
+
+- Both standalone and Pi companion configurations compiled successfully on macOS with ESP-IDF 6.
+- Generated Kconfig and compilation database confirm the intended module exclusion/inclusion.
+- Linked memory summaries and hashes were compared; standalone linked image is 1,904 bytes smaller.
+- Neither modular image was flashed or functionally tested on a physical device.
+- No claim of hardware acceptance or compatibility with other boards is made.
+- Do not require an extra identical ESP32 from this user or propose flashing their stable setup for this feature.
+
+Preserve `stable/hey-muse-2026-11-21-wake-tested` as the **last user-confirmed hardware-tested baseline**. Keep the modular changes available on `feature/modular-esp32-pi-bridge-2026-11` / draft PR #8, labelled compile-verified until future hardware evidence is supplied. Future users can test on compatible hardware at their own discretion.
