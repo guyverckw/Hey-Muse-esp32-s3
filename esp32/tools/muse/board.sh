@@ -19,7 +19,7 @@
 # USB device (tools/muse/ports.py); with several of a kind attached, pass the
 # one's USB serial number (the MAC on native USB) or its port. Flashing from a
 # sandboxed agent needs the sandbox disabled (serial port access).
-# MUSE_BENCH=1 adds devices/sdkconfig.muse-bench (screenshots) and builds and
+# MUSE_PI_BRIDGE=1 selects the Pi-enabled firmware and its own -pi build directory.\n# Default MUSE_PI_BRIDGE=0 makes a standalone firmware without Pi HTTP.\n# MUSE_BENCH=1 adds devices/sdkconfig.muse-bench (screenshots) and builds and
 # flashes in build-muse-<profile>-bench/, so neither build's sdkconfig hides
 # the other's.
 set -uo pipefail
@@ -59,10 +59,17 @@ command -v idf.py >/dev/null 2>&1 || { echo "idf.py not found; activate ESP-IDF 
 cd "$root"
 B=build-muse-$profile
 defaults="sdkconfig.defaults;devices/sdkconfig.muse;devices/sdkconfig.muse-$profile"
+# Select the Pi-enabled companion image explicitly. A distinct build directory
+# prevents an old sdkconfig from silently overriding the requested profile.
+case "${MUSE_PI_BRIDGE:-0}" in
+    0|"") ;;
+    1) B=$B-pi; defaults="$defaults;devices/sdkconfig.muse-pi-bridge" ;;
+    *) echo "MUSE_PI_BRIDGE must be 0 or 1" >&2; exit 2 ;;
+esac
 if [ -n "${MUSE_BENCH:-}" ]; then
     B=$B-bench; defaults="$defaults;devices/sdkconfig.muse-bench"
 fi
-log=/tmp/muse_build_$board.log
+log=/tmp/muse_build_$board${MUSE_PI_BRIDGE:+_pi}.log
 if [ "$cmd" = build ]; then
     # Boards share managed_components/ with each other and with the Link build,
     # so build one at a time. Each resolves a different dependency set, and the
