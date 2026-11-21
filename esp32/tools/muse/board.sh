@@ -69,7 +69,7 @@ esac
 if [ -n "${MUSE_BENCH:-}" ]; then
     B=$B-bench; defaults="$defaults;devices/sdkconfig.muse-bench"
 fi
-log=/tmp/muse_build_$board${MUSE_PI_BRIDGE:+_pi}.log
+log=/tmp/muse_build_${board}_${MUSE_PI_BRIDGE:-0}.log
 if [ "$cmd" = build ]; then
     # Boards share managed_components/ with each other and with the Link build,
     # so build one at a time. Each resolves a different dependency set, and the
