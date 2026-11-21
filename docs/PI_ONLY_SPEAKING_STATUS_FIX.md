@@ -95,3 +95,19 @@ This explains why previous Pi journal logs contained local `/health` requests bu
 **Current user-observed status:** OLED appears restored after moving Hey Muse onto the proper network. Full acceptance of the Pi-only 15-minute SPEAKING fallback is still pending a specifically timed long voice response (>90 seconds) that stays in SPEAKING until playback is complete. Existing full-length TTS and the Pi's 30-second cooldown are unchanged.
 
 **No further code changes required for the network mismatch.** Do not flash the alternative ESP32 status-heartbeat branch unless a separate issue arises.
+
+## Final physical acceptance — 2026-11-21
+
+**User-confirmed PASS.** Following correction of the ESP32/Pi Wi-Fi network mismatch, the user requested and received a **500-word Hey Muse answer** and reported: **"everything seems worked fine."** This is the final end-to-end regression test for the Pi-only OLED SPEAKING lifetime fix following the earlier 18/18 software test pass.
+
+Acceptance status:
+
+- [x] Pi Python compilation and regression suites: 18/18 PASS
+- [x] Pi service active, no recorded restarts, healthy HTTP bridge
+- [x] ESP32 and Pi communication restored on compatible Wi-Fi network
+- [x] OLED status transitions restored after network correction
+- [x] 500-word long-answer hardware test: overall user-confirmed PASS, including the OLED status behaviour in context
+- [x] Full-length Fish Audio speech and complete Pi e-paper replies were separately confirmed in preceding physical tests
+- [x] Pi environment confirmed 30-second e-paper cooldown before final test
+
+**Phase 6 OLED Pi-only SPEAKING fix: ACCEPTED based on user-reported testing.** ESP32 heartbeat modification in separate draft PR #5 was not flashed or needed. Preserve existing installed full-length TTS ESP32 firmware and Pi application; no additional action required.
