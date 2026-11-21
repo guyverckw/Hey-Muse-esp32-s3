@@ -4,7 +4,19 @@ An unofficial, community-maintained fork of the [Muse Gadgets SDK](https://githu
 
 > **Tested custom-avatar hardware:** Waveshare **ESP32-S3-Touch-AMOLED-1.75-B** (the non-C 1.75-inch board). For this board, use the **`s3n`** build target. **Do not use `s3`**, which selects the distinct 1.75C hardware profile.
 >
-> **Release source:** The custom-avatar work is on the [`feature/smooth-animation`](https://github.com/guyverckw/Hey-Muse-esp32-s3/tree/feature/smooth-animation) branch. A quick start that checks out this branch is provided below. The default branch may not contain the same avatar features.
+> **Stable, hardware-tested source:** [`stable/hey-muse-2026-11-21-wake-tested`](https://github.com/guyverckw/Hey-Muse-esp32-s3/tree/stable/hey-muse-2026-11-21-wake-tested). The modular standalone/Pi builds described here are experimental until both are compiled and physically checked; they are on `feature/modular-esp32-pi-bridge-2026-11`. The default repository branch may not yet include these changes.
+
+## Standalone vs Raspberry Pi companion
+
+This development branch offers two separate ESP-IDF build profiles. **Standalone ESP32 is the default**: it excludes the Raspberry Pi HTTP bridge, but retains Muse, the supported board UI and voice features. To build the existing Pi OLED/e-paper integration, set `MUSE_PI_BRIDGE=1` for **both** build and flash, and provide a private local bridge configuration header.
+
+```bash
+cd esp32
+tools/muse/board.sh build s3n                     # Standalone: no Pi code
+MUSE_PI_BRIDGE=1 tools/muse/board.sh build s3n     # Pi companion: opt-in
+```
+
+See [Modular ESP32 build instructions](docs/MODULAR_ESP32_BUILDS.md) for setup, secrets, validation and hardware limitations. **Do not flash either new profile onto the current tested devices before verifying the build.**
 
 ## What works
 
@@ -23,7 +35,7 @@ This is a personal/community project, not made or endorsed by Meta. Features and
 
 ```bash
 # 1. Clone the correct branch
-git clone --branch feature/smooth-animation --single-branch \
+git clone --branch feature/modular-esp32-pi-bridge-2026-11 --single-branch \
   https://github.com/guyverckw/Hey-Muse-esp32-s3.git
 cd Hey-Muse-esp32-s3/esp32
 
