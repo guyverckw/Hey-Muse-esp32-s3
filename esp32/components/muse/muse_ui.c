@@ -15,6 +15,7 @@
  */
 
 #include "muse_ui.h"
+#include "muse_tts_wake_observer.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -1356,6 +1357,10 @@ static void update_status(muse_mode_t mode, float now)
 {
     uint32_t accent = muse_pixel_accent(mode);
     const char *name = muse_lang_get(mode == MUSE_MODE_IDLE ? s_idle_name : MODE_NAMES[mode]);
+    /* Temporary diagnostic label; keep the actual mode and voice flow unchanged. */
+    if (mode == MUSE_MODE_SPEAKING && muse_tts_wake_observer_detected()) {
+        name = "DETECTED";
+    }
 
     if (name != s_shown_name) {
         lv_label_set_text(s_state_lbl, name);
