@@ -217,7 +217,11 @@ esp_err_t muse_fish_tts_generate(const char *api_key, const char *voice_id, cons
     if (err == ESP_OK) {
         err = emit_pcm(&stream);
     }
-    if (err != ESP_OK) {
+    if (err == ESP_ERR_INVALID_STATE && stream.error == ESP_ERR_INVALID_STATE) {
+        /* The PCM consumer declined more audio, normally because the user
+         * interrupted this turn. This is not an upstream Fish Audio failure. */
+        ESP_LOGI(TAG, "Fish Audio PCM consumer stopped playback (turn cancelled or superseded)");
+    } else if (err != ESP_OK) {
         ESP_LOGW(TAG, "Fish Audio TTS failed: %s", esp_err_to_name(err));
     }
     return err;
