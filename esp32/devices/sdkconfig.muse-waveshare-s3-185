@@ -1,0 +1,13 @@
+# Waveshare ESP32-S3-Touch-LCD-1.85 Rev 2.1; verified 16MB flash / 8MB OPI PSRAM.
+# Separate target; do not share 1.75 AMOLED configuration.
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_MUSE_BOARD_WAVESHARE_S3_185=y
+CONFIG_MUSE_CJK_FONT=y
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+# First LCD/touch bring-up: avoid sleep while power and expander logic are unverified.
+# CONFIG_PM_ENABLE is not set
