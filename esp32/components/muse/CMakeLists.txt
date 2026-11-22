@@ -81,6 +81,12 @@ if(CONFIG_MUSE_ENABLED)
             list(APPEND srcs "muse_wake.cpp")
             list(APPEND embed "models/hey_muse.tflite")
         endif()
+    elseif(CONFIG_MUSE_BOARD_WAVESHARE_S3_185)
+        # Dedicated 360x360 QSPI LCD, CST816 and TCA9554 hardware path.
+        # Audio intentionally excluded from the first display bring-up.
+        list(APPEND srcs "boards/board_waveshare_s3_185.c"
+                         "boards/esp_lcd_st77916.c"
+                         "boards/muse_lcd_bands.c")
     elseif(CONFIG_MUSE_BOARD_AIPI)
         list(APPEND srcs "boards/board_aipi.c")
     elseif(CONFIG_MUSE_BOARD_ESPRESSIF_BOX_3)
