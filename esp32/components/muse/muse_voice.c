@@ -882,14 +882,17 @@ static void voice_task(void *arg)
     bool pending_down = false;
     muse_audio_selftest();
     for (;;) {
-        bool hands_free = s_pending_handsfree_barge;
+        /* The AEC wake is a complete trigger: skip idle wake detection and
+         * go straight to hands-free recording after the speaker tail settles. */
+        bool aec_barge = s_pending_handsfree_barge;
+        bool hands_free = aec_barge;
         s_pending_handsfree_barge = false;
         bool wake = false;
         /* Never allow the regular mic/wake reader to race the AEC worker. */
         while (!muse_tts_wake_observer_quiescent()) {
             vTaskDelay(pdMS_TO_TICKS(20));
         }
-        if (!pending_down) {
+        if (!pending_down && !aec_barge) {
             muse_input_event_t ev;
             bool asleep = muse_state_asleep();
             bool battery = muse_state_on_battery();
@@ -983,7 +986,9 @@ static void voice_task(void *arg)
         }
         size_t held;
         char why[96];
-        bool ok = record(pending_down, hands_free, &held, why, sizeof(why));
+        /* AEC barge is hands-free but still needs the barge_in speaker-tail
+         * discard; passing pending_down alone would replay stale pre-roll. */
+        bool ok = record(pending_down || aec_barge, hands_free, &held, why, sizeof(why));
         pending_down = false;
         if (held < MIN_HELD_FRAMES && !wake && !hands_free) {
             muse_hatch_turn_cancel();
