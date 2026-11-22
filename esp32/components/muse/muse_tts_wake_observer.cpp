@@ -49,6 +49,8 @@ void monitor_task(void *)
     if (!aec) {
         ESP_LOGE(TAG, "AEC init failed (memory or component), no monitoring");
         s_running = false;
+        vQueueDelete(s_refs);
+        s_refs = nullptr;
         s_worker_alive = false;
         vTaskDelete(nullptr);
         return;
@@ -58,6 +60,8 @@ void monitor_task(void *)
         ESP_LOGE(TAG, "Unsupported AEC frame size: %d", frames);
         aec_destroy(aec);
         s_running = false;
+        vQueueDelete(s_refs);
+        s_refs = nullptr;
         s_worker_alive = false;
         vTaskDelete(nullptr);
         return;
@@ -102,6 +106,11 @@ void monitor_task(void *)
     ESP_LOGI(TAG, "AEC observer stopped; missing/overflow references=%lu",
              static_cast<unsigned long>(s_overflows));
     aec_destroy(aec);
+    /* A worker can outlive the caller's bounded shutdown wait. The worker
+     * therefore owns queue cleanup, avoiding a premature free or a leak. */
+    s_running = false;
+    vQueueDelete(s_refs);
+    s_refs = nullptr;
     s_worker_alive = false;
     vTaskDelete(nullptr);
 }
@@ -109,7 +118,9 @@ void monitor_task(void *)
 
 extern "C" void muse_tts_wake_observer_start(void)
 {
-    if (s_running || !muse_wake_enabled()) return;
+    /* Never start a second worker while a previous one is winding down:
+     * doing so would replace its reference queue and risk use-after-free. */
+    if (s_running || s_worker_alive || !muse_wake_enabled()) return;
     s_detected_until_ms = 0;
     s_overflows = 0;
     s_refs = xQueueCreate(kQueueDepth, sizeof(RefChunk));
@@ -158,12 +169,7 @@ extern "C" void muse_tts_wake_observer_stop(void)
         vTaskDelay(pdMS_TO_TICKS(10));
     }
     if (s_worker_alive) {
-        ESP_LOGE(TAG, "Observer worker did not exit; leaving reference queue allocated");
-        return;
-    }
-    if (s_refs) {
-        vQueueDelete(s_refs);
-        s_refs = nullptr;
+        ESP_LOGW(TAG, "Observer shutdown pending; further tests disabled until worker exits");
     }
 }
 #endif
