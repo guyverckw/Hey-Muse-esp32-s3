@@ -24,7 +24,7 @@ The following pins are transcribed from the Rev 2.1 schematic's hardware table a
 | Touch SDA, SCL, INT | GPIO1, GPIO2, GPIO3 |
 | LCD backlight PWM | GPIO4 |
 | LCD CS, CLK | GPIO19, GPIO41 |
-| LCD data QSPI D0, D1, D2, D3 | GPIO46, GPIO45, GPIO40? (schematic table lacks D2), GPIO42 |
+| LCD data QSPI D0, D1, D2, D3 | GPIO46, GPIO45, not confirmed, GPIO42 |
 | Touch reset | expander EXIO0 |
 | LCD reset | expander EXIO1 |
 | I2C sensors/expander | GPIO10 SCL, GPIO11 SDA |
