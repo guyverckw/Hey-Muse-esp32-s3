@@ -22,6 +22,7 @@
 
 #include "esp_check.h"
 #include "esp_codec_dev.h"
+#include "muse_tts_wake_observer.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -303,6 +304,14 @@ esp_err_t muse_audio_write(const int16_t *mono, size_t frames)
             s_out_stereo[2 * i] = sample;
             s_out_stereo[2 * i + 1] = sample;
         }
+        /* Actual codec PCM (after mute/boost), supplied as AEC far-end reference.
+         * A zero-wait queue ensures diagnostic monitoring never blocks TTS. */
+        /* Stereo output has identical L/R samples; take one channel as mono. */
+#if CONFIG_MUSE_TTS_WAKE_OBSERVER
+        int16_t ref[MUSE_AUDIO_CHUNK];
+        for (size_t i = 0; i < n; ++i) ref[i] = s_out_stereo[2 * i];
+        muse_tts_wake_observer_reference(ref, n);
+#endif
         if (esp_codec_dev_write(s_spk, s_out_stereo, n * CHANNELS * sizeof(int16_t)) != ESP_CODEC_DEV_OK) {
             return ESP_FAIL;
         }

@@ -1,0 +1,2 @@
+# Phase 8 AEC wake observer. Diagnostic only; no automatic interruption.
+CONFIG_MUSE_TTS_WAKE_OBSERVER=y

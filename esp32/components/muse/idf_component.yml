@@ -38,6 +38,10 @@ dependencies:
     version: "^3.0.0"
     rules:
       - if: "$CONFIG{MUSE_BOARD_ID} == \"waveshare_s3_175c\""
+  espressif/esp-sr:
+    version: "2.6.1"
+    rules:
+      - if: "$CONFIG{MUSE_TTS_WAKE_OBSERVER} == True"
   espressif/esp-tflite-micro:
     version: "1.3.3~1"
     rules:

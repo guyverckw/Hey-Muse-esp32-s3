@@ -75,6 +75,9 @@ if(CONFIG_MUSE_ENABLED)
         # One driver: the 1.75 differs only in pins (its BSP's) and its PWR key.
         list(APPEND srcs "boards/board_waveshare_s3_175c.c" "boards/muse_lcd_bands.c")
         if(CONFIG_MUSE_BOARD_WAVESHARE_S3_175C OR CONFIG_MUSE_BOARD_WAVESHARE_S3_175)
+            if(CONFIG_MUSE_TTS_WAKE_OBSERVER)
+                list(APPEND srcs "muse_tts_wake_observer.cpp")
+            endif()
             list(APPEND srcs "muse_wake.cpp")
             list(APPEND embed "models/hey_muse.tflite")
         endif()
@@ -125,6 +128,9 @@ set(muse_priv_requires
     esp_lcd esp_adc esp_driver_i2s esp_driver_ledc esp_driver_spi esp_driver_uart esp_wifi
     esp_driver_pcnt)
 list(APPEND muse_priv_requires camera)
+if(CONFIG_MUSE_TTS_WAKE_OBSERVER)
+    list(APPEND muse_priv_requires espressif__esp-sr)
+endif()
 
 idf_component_register(
     SRCS ${srcs}

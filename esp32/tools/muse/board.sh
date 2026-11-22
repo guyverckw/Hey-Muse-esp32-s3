@@ -66,6 +66,12 @@ case "${MUSE_PI_BRIDGE:-0}" in
     1) B=$B-pi; defaults="$defaults;devices/sdkconfig.muse-pi-bridge" ;;
     *) echo "MUSE_PI_BRIDGE must be 0 or 1" >&2; exit 2 ;;
 esac
+# Independent test image. Does not overwrite the stable standalone/Pi build.
+case "${MUSE_AEC_TEST:-0}" in
+    0|"") ;;
+    1) B=$B-aec-test; defaults="$defaults;devices/sdkconfig.muse-aec-test" ;;
+    *) echo "MUSE_AEC_TEST must be 0 or 1" >&2; exit 2 ;;
+esac
 if [ -n "${MUSE_BENCH:-}" ]; then
     B=$B-bench; defaults="$defaults;devices/sdkconfig.muse-bench"
 fi

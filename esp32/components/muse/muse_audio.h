@@ -22,6 +22,10 @@
 
 #include "esp_err.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * The board's mic and speaker codecs share one duplex I2S bus, so both run at
  * the same format: 16 kHz, 16-bit, 2 slots. This module hides that and
@@ -60,3 +64,7 @@ float muse_audio_level(const int16_t *mono, size_t frames);
 
 /* Short UI chirp: rising for "go", falling for "done". */
 void muse_audio_chirp(int rising);
+
+#ifdef __cplusplus
+}
+#endif
