@@ -84,6 +84,8 @@ static volatile float s_monitor_db = -100.0f;
 static volatile bool s_chirp;
 static volatile bool s_loopback;
 static volatile bool s_mp3test;
+/* Owned by voice_task; marks an AEC wake that should resume as hands-free recording. */
+static bool s_pending_handsfree_barge;
 
 /*
  * Pre-roll: while idle the mic keeps running into this ring, so a recording
@@ -452,6 +454,23 @@ static bool hatch_reply(bool *delivered)
             muse_state_set_level(0);
             return true;
         }
+#if CONFIG_MUSE_TTS_BARGE_IN
+        if (speaking && muse_tts_wake_observer_take_barge()) {
+            ESP_LOGW(TAG, "Phase 9: AEC wake -> stopping TTS, switching to hands-free listening");
+            /* The playback owner, not the AEC worker, cancels the reply.
+             * Shut down the mic-reading worker before the recording path
+             * uses the same codec and wake model. */
+            muse_tts_wake_observer_stop();
+            muse_hatch_turn_cancel();
+            muse_state_set_level(0);
+            if (!muse_tts_wake_observer_quiescent()) {
+                ESP_LOGE(TAG, "Phase 9: AEC shutdown timed out; hands-free interruption aborted");
+                return false;
+            }
+            s_pending_handsfree_barge = true;
+            return true;
+        }
+#endif
         size_t n = muse_hatch_turn_read(buf, MUSE_AUDIO_CHUNK, speaking || done ? 0 : 20);
         if (n) {
             if (!speaking) {
@@ -863,8 +882,13 @@ static void voice_task(void *arg)
     bool pending_down = false;
     muse_audio_selftest();
     for (;;) {
-        bool hands_free = false;
+        bool hands_free = s_pending_handsfree_barge;
+        s_pending_handsfree_barge = false;
         bool wake = false;
+        /* Never allow the regular mic/wake reader to race the AEC worker. */
+        while (!muse_tts_wake_observer_quiescent()) {
+            vTaskDelay(pdMS_TO_TICKS(20));
+        }
         if (!pending_down) {
             muse_input_event_t ev;
             bool asleep = muse_state_asleep();
