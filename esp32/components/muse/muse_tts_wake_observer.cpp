@@ -122,7 +122,8 @@ extern "C" void muse_tts_wake_observer_start(void)
     s_worker_alive = true;
     if (xTaskCreate(monitor_task, "tts_aec_observer", 8192, nullptr, 5, nullptr) != pdPASS) {
         ESP_LOGE(TAG, "AEC worker creation failed");
-        s_running = s_worker_alive = false;
+        s_running = false;
+        s_worker_alive = false;
         vQueueDelete(s_refs);
         s_refs = nullptr;
     }
