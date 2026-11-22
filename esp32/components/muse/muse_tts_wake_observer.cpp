@@ -40,7 +40,18 @@ volatile bool s_running = false;
 volatile bool s_worker_alive = false;
 volatile uint32_t s_detected_until_ms = 0;
 volatile bool s_barge_pending = false;
-uint32_t s_overflows = 0;
+/* Counters are maintained on separate tasks; atomic builtins avoid lost updates.
+ * Queue overflow drops are distinct from the worker's missing references. */
+uint32_t s_queue_overflows = 0;
+
+void log_heap(const char *where)
+{
+    ESP_LOGI(TAG, "%s heap: internal free=%lu largest=%lu, PSRAM free=%lu",
+             where,
+             (unsigned long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+             (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+             (unsigned long)heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+}
 
 alignas(16) int16_t s_mic[kMaxAecFrames];
 alignas(16) int16_t s_ref[kMaxAecFrames];
@@ -76,6 +87,8 @@ void monitor_task(void *)
     ESP_LOGI(TAG, "AEC observer active: frame=%d samples, no TTS cancellation", frames);
     int offset = 0;
     bool complete_reference = true;
+    uint32_t missing_refs = 0;
+    uint32_t processed_aec_frames = 0;
     while (s_running) {
         int16_t mic[kAudioFrames];
         if (muse_audio_read(mic, kAudioFrames) != ESP_OK) {
@@ -90,7 +103,7 @@ void monitor_task(void *)
         if (!has_ref || n != kAudioFrames) {
             // Never accept a detection from a frame lacking a full speaker
             // reference: it could be our own unfiltered speaker output.
-            ++s_overflows;
+            ++missing_refs;
             complete_reference = false;
         }
         for (size_t i = 0; i < kAudioFrames; ++i) {
@@ -99,6 +112,7 @@ void monitor_task(void *)
             ++offset;
             if (offset == frames) {
                 aec_process(aec, s_mic, s_ref, s_clean);
+                ++processed_aec_frames;
                 if (complete_reference && muse_wake_process(s_clean, frames)) {
                     s_detected_until_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000) + kLabelMs;
                     ESP_LOGW(TAG, "DETECTED on AEC output; verify external speech, not speaker echo");
@@ -113,14 +127,16 @@ void monitor_task(void *)
             }
         }
     }
-    ESP_LOGI(TAG, "AEC observer stopped; missing/overflow references=%lu",
-             static_cast<unsigned long>(s_overflows));
+    ESP_LOGI(TAG, "AEC observer stopped: AEC frames=%lu, missing reference chunks=%lu, overwritten queue chunks=%lu",
+             (unsigned long)processed_aec_frames, (unsigned long)missing_refs,
+             (unsigned long)__atomic_load_n(&s_queue_overflows, __ATOMIC_RELAXED));
     aec_destroy(aec);
     /* A worker can outlive the caller's bounded shutdown wait. The worker
      * therefore owns queue cleanup, avoiding a premature free or a leak. */
     s_running = false;
     vQueueDeleteWithCaps(s_refs);
     s_refs = nullptr;
+    log_heap("AEC released");
     s_worker_alive = false;
     vTaskDeleteWithCaps(nullptr);
 }
@@ -133,7 +149,7 @@ extern "C" void muse_tts_wake_observer_start(void)
     if (s_running || s_worker_alive || !muse_wake_enabled()) return;
     s_detected_until_ms = 0;
     s_barge_pending = false;
-    s_overflows = 0;
+    __atomic_store_n(&s_queue_overflows, 0U, __ATOMIC_RELAXED);
     ESP_LOGI(TAG, "Start resources: largest internal=%lu, free internal=%lu, free PSRAM=%lu",
              (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
              (unsigned long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
@@ -167,7 +183,7 @@ extern "C" void muse_tts_wake_observer_reference(const int16_t *pcm, size_t fram
         RefChunk stale;
         xQueueReceive(s_refs, &stale, 0);
         xQueueSend(s_refs, &chunk, 0);
-        ++s_overflows;
+        __atomic_fetch_add(&s_queue_overflows, 1U, __ATOMIC_RELAXED);
     }
 }
 
