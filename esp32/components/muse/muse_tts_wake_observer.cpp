@@ -39,6 +39,7 @@ QueueHandle_t s_refs = nullptr;
 volatile bool s_running = false;
 volatile bool s_worker_alive = false;
 volatile uint32_t s_detected_until_ms = 0;
+volatile bool s_barge_pending = false;
 uint32_t s_overflows = 0;
 
 alignas(16) int16_t s_mic[kMaxAecFrames];
@@ -101,6 +102,10 @@ void monitor_task(void *)
                 if (complete_reference && muse_wake_process(s_clean, frames)) {
                     s_detected_until_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000) + kLabelMs;
                     ESP_LOGW(TAG, "DETECTED on AEC output; verify external speech, not speaker echo");
+#if CONFIG_MUSE_TTS_BARGE_IN
+                    /* Latch for the playback owner. Never cancel TTS from this task. */
+                    s_barge_pending = true;
+#endif
                     muse_wake_reset(); // require another complete wake phrase
                 }
                 offset = 0;
@@ -127,6 +132,7 @@ extern "C" void muse_tts_wake_observer_start(void)
      * doing so would replace its reference queue and risk use-after-free. */
     if (s_running || s_worker_alive || !muse_wake_enabled()) return;
     s_detected_until_ms = 0;
+    s_barge_pending = false;
     s_overflows = 0;
     ESP_LOGI(TAG, "Start resources: largest internal=%lu, free internal=%lu, free PSRAM=%lu",
              (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
@@ -172,9 +178,26 @@ extern "C" bool muse_tts_wake_observer_detected(void)
     return static_cast<int32_t>(s_detected_until_ms - now) > 0;
 }
 
+extern "C" bool muse_tts_wake_observer_take_barge(void)
+{
+#if CONFIG_MUSE_TTS_BARGE_IN
+    if (!s_running || !s_barge_pending) return false;
+    s_barge_pending = false;
+    return true;
+#else
+    return false;
+#endif
+}
+
+extern "C" bool muse_tts_wake_observer_quiescent(void)
+{
+    return !s_worker_alive;
+}
+
 extern "C" void muse_tts_wake_observer_stop(void)
 {
     s_running = false;
+    s_barge_pending = false;
     for (unsigned i = 0; i < 120 && s_worker_alive; ++i) {
         vTaskDelay(pdMS_TO_TICKS(10));
     }

@@ -1,0 +1,2 @@
+# Phase 9: enable AEC human-wake interruption; requires MUSE_AEC_TEST=1.
+CONFIG_MUSE_TTS_BARGE_IN=y

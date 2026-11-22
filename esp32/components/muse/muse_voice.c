@@ -84,6 +84,8 @@ static volatile float s_monitor_db = -100.0f;
 static volatile bool s_chirp;
 static volatile bool s_loopback;
 static volatile bool s_mp3test;
+/* Owned by voice_task; marks an AEC wake that should resume as hands-free recording. */
+static bool s_pending_handsfree_barge;
 
 /*
  * Pre-roll: while idle the mic keeps running into this ring, so a recording
@@ -452,6 +454,23 @@ static bool hatch_reply(bool *delivered)
             muse_state_set_level(0);
             return true;
         }
+#if CONFIG_MUSE_TTS_BARGE_IN
+        if (speaking && muse_tts_wake_observer_take_barge()) {
+            ESP_LOGW(TAG, "Phase 9: AEC wake -> stopping TTS, switching to hands-free listening");
+            /* The playback owner, not the AEC worker, cancels the reply.
+             * Shut down the mic-reading worker before the recording path
+             * uses the same codec and wake model. */
+            muse_tts_wake_observer_stop();
+            muse_hatch_turn_cancel();
+            muse_state_set_level(0);
+            if (!muse_tts_wake_observer_quiescent()) {
+                ESP_LOGE(TAG, "Phase 9: AEC shutdown timed out; hands-free interruption aborted");
+                return false;
+            }
+            s_pending_handsfree_barge = true;
+            return true;
+        }
+#endif
         size_t n = muse_hatch_turn_read(buf, MUSE_AUDIO_CHUNK, speaking || done ? 0 : 20);
         if (n) {
             if (!speaking) {
@@ -863,9 +882,17 @@ static void voice_task(void *arg)
     bool pending_down = false;
     muse_audio_selftest();
     for (;;) {
-        bool hands_free = false;
+        /* The AEC wake is a complete trigger: skip idle wake detection and
+         * go straight to hands-free recording after the speaker tail settles. */
+        bool aec_barge = s_pending_handsfree_barge;
+        bool hands_free = aec_barge;
+        s_pending_handsfree_barge = false;
         bool wake = false;
-        if (!pending_down) {
+        /* Never allow the regular mic/wake reader to race the AEC worker. */
+        while (!muse_tts_wake_observer_quiescent()) {
+            vTaskDelay(pdMS_TO_TICKS(20));
+        }
+        if (!pending_down && !aec_barge) {
             muse_input_event_t ev;
             bool asleep = muse_state_asleep();
             bool battery = muse_state_on_battery();
@@ -959,7 +986,9 @@ static void voice_task(void *arg)
         }
         size_t held;
         char why[96];
-        bool ok = record(pending_down, hands_free, &held, why, sizeof(why));
+        /* AEC barge is hands-free but still needs the barge_in speaker-tail
+         * discard; passing pending_down alone would replay stale pre-roll. */
+        bool ok = record(pending_down || aec_barge, hands_free, &held, why, sizeof(why));
         pending_down = false;
         if (held < MIN_HELD_FRAMES && !wake && !hands_free) {
             muse_hatch_turn_cancel();

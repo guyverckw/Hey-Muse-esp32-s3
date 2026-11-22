@@ -72,6 +72,16 @@ case "${MUSE_AEC_TEST:-0}" in
     1) B=$B-aec-test; defaults="$defaults;devices/sdkconfig.muse-aec-test" ;;
     *) echo "MUSE_AEC_TEST must be 0 or 1" >&2; exit 2 ;;
 esac
+# Phase 9 has its own image/config so Phase 8 remains an observer-only control.
+case "${MUSE_BARGE_TEST:-0}" in
+    0|"") ;;
+    1)
+        [ "${MUSE_AEC_TEST:-0}" = 1 ] || { echo "MUSE_BARGE_TEST=1 requires MUSE_AEC_TEST=1" >&2; exit 2; }
+        B=$B-barge-test
+        defaults="$defaults;devices/sdkconfig.muse-barge-test"
+        ;;
+    *) echo "MUSE_BARGE_TEST must be 0 or 1" >&2; exit 2 ;;
+esac
 if [ -n "${MUSE_BENCH:-}" ]; then
     B=$B-bench; defaults="$defaults;devices/sdkconfig.muse-bench"
 fi
