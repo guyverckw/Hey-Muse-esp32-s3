@@ -1012,6 +1012,15 @@ static void on_any_press(lv_event_t *e)
 {
     (void)e;
     muse_state_poke();
+    /* Display-only boards have no working push-to-talk button yet. Their
+     * pairing prompt explicitly says "Tap screen": translate that touch
+     * into the same Link pairing confirmation as the talk key. The handler
+     * is attached to the input device so touches on top-layer overlays count.
+     * Boards with audio retain their existing physical-button flow. */
+    if (!muse_board->audio_init && muse_link_state() == MUSE_LINK_CONFIRM) {
+        ESP_LOGI(TAG, "confirming Muse app pairing by touchscreen");
+        muse_link_talk_press();
+    }
 }
 
 static void build_overlays(void)
