@@ -14,6 +14,8 @@
 
 #include "esp_aec.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
+#include "freertos/idf_additions.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -47,12 +49,15 @@ void monitor_task(void *)
 {
     aec_handle_t *aec = aec_create(16000, 4, 1, AEC_MODE_FD_LOW_COST);
     if (!aec) {
-        ESP_LOGE(TAG, "AEC init failed (memory or component), no monitoring");
+        ESP_LOGE(TAG, "AEC init failed; largest internal=%lu, free internal=%lu, free PSRAM=%lu",
+                 (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                 (unsigned long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                 (unsigned long)heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
         s_running = false;
-        vQueueDelete(s_refs);
+        vQueueDeleteWithCaps(s_refs);
         s_refs = nullptr;
         s_worker_alive = false;
-        vTaskDelete(nullptr);
+        vTaskDeleteWithCaps(nullptr);
         return;
     }
     const int frames = aec_get_chunksize(aec);
@@ -60,10 +65,10 @@ void monitor_task(void *)
         ESP_LOGE(TAG, "Unsupported AEC frame size: %d", frames);
         aec_destroy(aec);
         s_running = false;
-        vQueueDelete(s_refs);
+        vQueueDeleteWithCaps(s_refs);
         s_refs = nullptr;
         s_worker_alive = false;
-        vTaskDelete(nullptr);
+        vTaskDeleteWithCaps(nullptr);
         return;
     }
 
@@ -109,10 +114,10 @@ void monitor_task(void *)
     /* A worker can outlive the caller's bounded shutdown wait. The worker
      * therefore owns queue cleanup, avoiding a premature free or a leak. */
     s_running = false;
-    vQueueDelete(s_refs);
+    vQueueDeleteWithCaps(s_refs);
     s_refs = nullptr;
     s_worker_alive = false;
-    vTaskDelete(nullptr);
+    vTaskDeleteWithCaps(nullptr);
 }
 } // namespace
 
@@ -123,19 +128,24 @@ extern "C" void muse_tts_wake_observer_start(void)
     if (s_running || s_worker_alive || !muse_wake_enabled()) return;
     s_detected_until_ms = 0;
     s_overflows = 0;
-    s_refs = xQueueCreate(kQueueDepth, sizeof(RefChunk));
+    ESP_LOGI(TAG, "Start resources: largest internal=%lu, free internal=%lu, free PSRAM=%lu",
+             (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+             (unsigned long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+             (unsigned long)heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    s_refs = xQueueCreateWithCaps(kQueueDepth, sizeof(RefChunk), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!s_refs) {
-        ESP_LOGE(TAG, "Reference queue allocation failed");
+        ESP_LOGE(TAG, "PSRAM reference queue allocation failed");
         return;
     }
     muse_wake_reset();
     s_running = true;
     s_worker_alive = true;
-    if (xTaskCreate(monitor_task, "tts_aec_observer", 8192, nullptr, 5, nullptr) != pdPASS) {
-        ESP_LOGE(TAG, "AEC worker creation failed");
+    if (xTaskCreateWithCaps(monitor_task, "tts_aec_observer", 8192, nullptr, 5, nullptr,
+                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
+        ESP_LOGE(TAG, "PSRAM AEC worker creation failed");
         s_running = false;
         s_worker_alive = false;
-        vQueueDelete(s_refs);
+        vQueueDeleteWithCaps(s_refs);
         s_refs = nullptr;
     }
 }
