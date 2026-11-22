@@ -183,6 +183,16 @@ menu "Muse"
             three seconds but DOES NOT interrupt playback. Full-duplex
             reference delay is not yet calibrated; use only on a test build.
 
+    config MUSE_TTS_BARGE_IN
+        bool "Experimental Phase 9: interrupt TTS using AEC Hey Muse detection"
+        depends on MUSE_TTS_WAKE_OBSERVER
+        default n
+        help
+            On an AEC-cleaned wake detection, cancel Fish Audio playback and
+            enter the existing hands-free recording flow. The AEC worker must
+            terminate before the regular microphone reader resumes.
+            Experimental: keep off in stable builds and in Phase 8 tests.
+
     config MUSE_PI_BRIDGE
         bool "Forward replies and voice status to Raspberry Pi"
         depends on MUSE_HATCH
